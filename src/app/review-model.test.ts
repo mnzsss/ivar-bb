@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByRepo, toAnnotations, toCommentRange } from "./review-model";
+import { countChanges, groupByRepo, toAnnotations, toCommentRange, toggleKey } from "./review-model";
 
 const file = (repo: string, path: string) => ({ repo, path, patch: "" });
 const comment = (id: string, repo: string, path: string, line_end: number, status: "open" | "resolved" = "open") =>
@@ -31,5 +31,22 @@ describe("toCommentRange", () => {
   it("rejects a selection touching deleted lines, since comments carry no side", () => {
     expect(toCommentRange({ start: 3, side: "deletions", end: 3 })).toEqual({ kind: "rejected" });
     expect(toCommentRange({ start: 3, side: "additions", end: 5, endSide: "deletions" })).toEqual({ kind: "rejected" });
+  });
+});
+
+describe("toggleKey", () => {
+  it("adds a missing key and removes a present one without mutating the input", () => {
+    const empty = new Set<string>();
+    const one = toggleKey(empty, "api/a");
+    expect([...one]).toEqual(["api/a"]);
+    expect([...toggleKey(one, "api/a")]).toEqual([]);
+    expect(empty.size).toBe(0);
+  });
+});
+
+describe("countChanges", () => {
+  it("counts added and removed lines, ignoring the file headers", () => {
+    const patch = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n ctx\n-old\n+new\n+more\n";
+    expect(countChanges(patch)).toEqual({ additions: 2, deletions: 1 });
   });
 });

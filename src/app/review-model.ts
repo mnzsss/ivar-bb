@@ -20,3 +20,20 @@ export function toCommentRange(selection: SelectedLineRange | null): CommentRang
   if (selection.side === "deletions" || (selection.endSide ?? selection.side) === "deletions") return { kind: "rejected" };
   return { kind: "range", start: Math.min(selection.start, selection.end), end: Math.max(selection.start, selection.end), side: "additions" };
 }
+
+export function toggleKey(keys: ReadonlySet<string>, key: string): Set<string> {
+  const next = new Set(keys);
+  if (!next.delete(key)) next.add(key);
+  return next;
+}
+
+export function countChanges(patch: string) {
+  const body = patch.slice(Math.max(0, patch.indexOf("\n@@")));
+  let additions = 0;
+  let deletions = 0;
+  for (const line of body.split("\n")) {
+    if (line.startsWith("+")) additions++;
+    else if (line.startsWith("-")) deletions++;
+  }
+  return { additions, deletions };
+}
