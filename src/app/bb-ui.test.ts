@@ -1,8 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const bbStyledScreens = ["src/app/review-view.tsx", "src/app/file-diff.tsx"];
-const noInlineStyleScreens = ["src/app/review-view.tsx"];
+const bbStyledScreens = [
+  "src/app/review-view.tsx",
+  "src/app/file-diff.tsx",
+  "app.tsx",
+  "src/app/hall-view.tsx",
+];
+const noInlineStyleScreens = ["src/app/review-view.tsx", "app.tsx", "src/app/hall-view.tsx"];
 
 describe("plugin screens follow bb's design system", () => {
   it.each(bbStyledScreens)("%s renders bb components instead of native controls", (file) => {
