@@ -61,6 +61,7 @@ export function IvarFileDiff({ file, view, comments, onAdd, onResolve }: {
         enableLineSelection: true,
         onLineSelected: (r) => setRange(toCommentRange(r)),
       }}
+      selectedLines={range}
       lineAnnotations={[
         ...toAnnotations(file, comments),
         ...(range ? [{ side: "additions" as const, lineNumber: range.end, metadata: null }] : []),
