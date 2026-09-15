@@ -1,11 +1,18 @@
-import { readFile as fsReadFile } from "node:fs/promises";
+import * as nodeFs from "node:fs/promises";
 import { join } from "node:path";
 import { checked, ivarJson, type Exec } from "./exec.js";
 import { featureStatus, type FileDiffEntry, type RepoDiffError } from "./schemas.js";
 
 export type { FileDiffEntry, RepoDiffError } from "./schemas.js";
 
-export type ReadFile = (path: string) => Promise<Buffer>;
+export type UntrackedFs = {
+  lstat(
+    path: string,
+  ): Promise<{ isDirectory(): boolean; isSymbolicLink(): boolean; size: number; mode: number }>;
+  readFile(path: string): Promise<Buffer>;
+  readlink(path: string): Promise<string>;
+};
+export type NewFileMode = "100644" | "100755" | "120000";
 export const UNTRACKED_MAX_BYTES = 1024 * 1024;
 
 const GIT_DIFF = [
@@ -53,9 +60,13 @@ export function splitPatch(repo: string, unified: string): FileDiffEntry[] {
     });
 }
 
-export function untrackedPatch(path: string, content: Buffer): string {
-  const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n`;
-  if (content.length > UNTRACKED_MAX_BYTES || content.includes(0))
+export function untrackedPatch(
+  path: string,
+  content: Buffer | "binary",
+  mode: NewFileMode = "100644",
+): string {
+  const header = `diff --git a/${path} b/${path}\nnew file mode ${mode}\n`;
+  if (content === "binary" || content.length > UNTRACKED_MAX_BYTES || content.includes(0))
     return `${header}Binary files /dev/null and b/${path} differ\n`;
   if (content.length === 0) return header;
   const text = content.toString("utf8");
@@ -73,7 +84,7 @@ export async function featureDiff(
   root: string,
   feature: string,
   run: Exec,
-  readFile: ReadFile = (p) => fsReadFile(p),
+  fs: UntrackedFs = nodeFs,
 ): Promise<{ files: FileDiffEntry[]; errors: RepoDiffError[] }> {
   const status = await ivarJson(root, ["feature", "status", "--", feature], run, featureStatus);
   const results = await Promise.all(
@@ -89,7 +100,7 @@ export async function featureDiff(
             await checked(run, "git", [...GIT_DIFF, base], r.worktree),
           );
           return {
-            files: [...tracked, ...(await untrackedDiff(r.repo, r.worktree, run, readFile))],
+            files: [...tracked, ...(await untrackedDiff(r.repo, r.worktree, run, fs))],
             errors: [],
           };
         } catch (e) {
@@ -104,7 +115,7 @@ async function untrackedDiff(
   repo: string,
   worktree: string,
   run: Exec,
-  readFile: ReadFile,
+  fs: UntrackedFs,
 ): Promise<FileDiffEntry[]> {
   const listed = await checked(
     run,
@@ -112,14 +123,37 @@ async function untrackedDiff(
     ["ls-files", "--others", "--exclude-standard", "-z"],
     worktree,
   );
-  return Promise.all(
+  const entries = await Promise.all(
     listed
       .split("\0")
-      .filter(Boolean)
-      .map(async (path) => ({
-        repo,
-        path,
-        patch: untrackedPatch(path, await readFile(join(worktree, path))),
-      })),
+      .filter((path) => path && !path.endsWith("/"))
+      .map(async (path) => {
+        const patch = await skipMissing(untrackedEntryPatch(path, join(worktree, path), fs));
+        return patch === null ? [] : [{ repo, path, patch }];
+      }),
   );
+  return entries.flat();
+}
+
+async function untrackedEntryPatch(
+  path: string,
+  absolute: string,
+  fs: UntrackedFs,
+): Promise<string | null> {
+  const stat = await fs.lstat(absolute);
+  if (stat.isSymbolicLink())
+    return untrackedPatch(path, Buffer.from(await fs.readlink(absolute)), "120000");
+  if (stat.isDirectory()) return null;
+  const mode = stat.mode & 0o111 ? "100755" : "100644";
+  if (stat.size > UNTRACKED_MAX_BYTES) return untrackedPatch(path, "binary", mode);
+  return untrackedPatch(path, await fs.readFile(absolute), mode);
+}
+
+async function skipMissing(patch: Promise<string | null>): Promise<string | null> {
+  try {
+    return await patch;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
 }
