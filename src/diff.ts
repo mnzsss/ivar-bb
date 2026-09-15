@@ -1,8 +1,7 @@
 import { checked, ivarJson, type Exec } from "./exec.js";
-import { featureStatus } from "./schemas.js";
+import { featureStatus, type FileDiffEntry, type RepoDiffError } from "./schemas.js";
 
-export type FileDiffEntry = { repo: string; path: string; patch: string };
-export type RepoDiffError = { repo: string; message: string };
+export type { FileDiffEntry, RepoDiffError } from "./schemas.js";
 
 const GIT_DIFF = ["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"];
 

@@ -1,11 +1,8 @@
 import path from "node:path";
 import { checkedStdout, ivarJson, parseIvarJson, type Exec } from "./exec.js";
-import { featureList, repoList } from "./schemas.js";
+import { featureList, repoList, type HallView } from "./schemas.js";
 
-export type HallView =
-  | { status: "ok"; root: string; repos: string[]; features: Array<{ name: string; promoted: string[] }> }
-  | { status: "no-hall" }
-  | { status: "ivar-missing" };
+export type { HallView } from "./schemas.js";
 
 export type HallCommand =
   | { command: "sync" }

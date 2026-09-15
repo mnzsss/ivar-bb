@@ -1,11 +1,11 @@
 import { useCallback, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { ivarRpcContract } from "../rpc.js";
-import type { HallCommand, HallView as HallData } from "../hall.js";
+import type { HallCommand } from "../hall.js";
+import type { ExecResult as RunResult } from "../exec.js";
+import type { HallView as HallData } from "../schemas.js";
 import { hallSummary } from "./hall-model.js";
 import { usePolling } from "./use-polling.js";
-
-type RunResult = { code: number; stdout: string; stderr: string };
 
 export function HallView({ projectId }: { projectId: string }) {
   const rpc = useRpc<typeof ivarRpcContract>();

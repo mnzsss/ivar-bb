@@ -1,32 +1,14 @@
 import { z } from "zod";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
-import { reviewComment } from "./schemas.js";
+import { featureDiffResult, hallView, reviewComment } from "./schemas.js";
 
 const projectInput = z.object({ projectId: z.string() });
-const featureInput = projectInput.extend({ feature: z.string() });
+const featureInput = projectInput.extend({ feature: z.string().min(1) });
 const lineNumber = z.number().int().positive();
 
 export const ivarRpcContract = defineRpcContract({
-  "hall.get": {
-    input: projectInput,
-    output: z.discriminatedUnion("status", [
-      z.object({
-        status: z.literal("ok"),
-        root: z.string(),
-        repos: z.array(z.string()),
-        features: z.array(z.object({ name: z.string(), promoted: z.array(z.string()) })),
-      }),
-      z.object({ status: z.literal("no-hall") }),
-      z.object({ status: z.literal("ivar-missing") }),
-    ]),
-  },
-  "feature.diff": {
-    input: featureInput,
-    output: z.object({
-      files: z.array(z.object({ repo: z.string(), path: z.string(), patch: z.string() })),
-      errors: z.array(z.object({ repo: z.string(), message: z.string() })),
-    }),
-  },
+  "hall.get": { input: projectInput, output: hallView },
+  "feature.diff": { input: featureInput, output: featureDiffResult },
   "comments.list": { input: featureInput, output: z.object({ comments: z.array(reviewComment) }) },
   "comments.add": {
     input: featureInput
