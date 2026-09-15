@@ -26,6 +26,7 @@ describe("featureDiff", () => {
         { repo: "web", worktree: "/h/.ivar/repos/web/checkout", base: "main", worktree_present: false },
       ] }) };
       if (args[0] === "merge-base") return { code: 0, stdout: "abc123\n", stderr: "" };
+      if (args[0] === "ls-files") return { code: 0, stdout: "", stderr: "" };
       return { code: 0, stdout: patch, stderr: "" };
     };
     const files = await featureDiff("/h", "checkout", run);
@@ -33,5 +34,19 @@ describe("featureDiff", () => {
     expect(calls).toContainEqual(["git", ["merge-base", "main", "HEAD"], "/h/.ivar/repos/api/checkout"]);
     expect(calls).toContainEqual(["git", ["diff", "--no-color", "--no-ext-diff", "abc123"], "/h/.ivar/repos/api/checkout"]);
     expect(calls.some(([, , cwd]) => cwd.includes("/web/"))).toBe(false);
+  });
+  it("includes untracked files as new-file patches", async () => {
+    const run: Exec = async (cmd, args) => {
+      if (cmd === "ivar") return { code: 0, stderr: "", stdout: JSON.stringify({ repos: [
+        { repo: "api", worktree: "/h/.ivar/repos/api/checkout", base: "main", worktree_present: true },
+      ] }) };
+      if (args[0] === "merge-base") return { code: 0, stdout: "abc123\n", stderr: "" };
+      if (args[0] === "ls-files") return { code: 0, stdout: "notes/new.md\0", stderr: "" };
+      if (args.includes("--no-index")) return { code: 1, stderr: "", stdout: "diff --git a/notes/new.md b/notes/new.md\nnew file mode 100644\n--- /dev/null\n+++ b/notes/new.md\n@@ -0,0 +1 @@\n+hi\n" };
+      return { code: 0, stdout: "", stderr: "" };
+    };
+    const files = await featureDiff("/h", "checkout", run);
+    expect(files.map((f) => `${f.repo}:${f.path}`)).toEqual(["api:notes/new.md"]);
+    expect(files[0]!.patch.startsWith("diff --git")).toBe(true);
   });
 });
