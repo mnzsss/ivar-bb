@@ -1,7 +1,12 @@
+import { readFile as fsReadFile } from "node:fs/promises";
+import { join } from "node:path";
 import { checked, ivarJson, type Exec } from "./exec.js";
 import { featureStatus, type FileDiffEntry, type RepoDiffError } from "./schemas.js";
 
 export type { FileDiffEntry, RepoDiffError } from "./schemas.js";
+
+export type ReadFile = (path: string) => Promise<Buffer>;
+export const UNTRACKED_MAX_BYTES = 1024 * 1024;
 
 const GIT_DIFF = [
   "-c",
@@ -48,10 +53,27 @@ export function splitPatch(repo: string, unified: string): FileDiffEntry[] {
     });
 }
 
+export function untrackedPatch(path: string, content: Buffer): string {
+  const header = `diff --git a/${path} b/${path}\nnew file mode 100644\n`;
+  if (content.length > UNTRACKED_MAX_BYTES || content.includes(0))
+    return `${header}Binary files /dev/null and b/${path} differ\n`;
+  if (content.length === 0) return header;
+  const text = content.toString("utf8");
+  const endsWithNewline = text.endsWith("\n");
+  const lines = (endsWithNewline ? text.slice(0, -1) : text).split("\n");
+  const range = lines.length === 1 ? "1" : `1,${lines.length}`;
+  return (
+    `${header}--- /dev/null\n+++ b/${path}\n@@ -0,0 +${range} @@\n` +
+    lines.map((line) => `+${line}\n`).join("") +
+    (endsWithNewline ? "" : "\\ No newline at end of file\n")
+  );
+}
+
 export async function featureDiff(
   root: string,
   feature: string,
   run: Exec,
+  readFile: ReadFile = (p) => fsReadFile(p),
 ): Promise<{ files: FileDiffEntry[]; errors: RepoDiffError[] }> {
   const status = await ivarJson(root, ["feature", "status", "--", feature], run, featureStatus);
   const results = await Promise.all(
@@ -67,7 +89,7 @@ export async function featureDiff(
             await checked(run, "git", [...GIT_DIFF, base], r.worktree),
           );
           return {
-            files: [...tracked, ...(await untrackedDiff(r.repo, r.worktree, run))],
+            files: [...tracked, ...(await untrackedDiff(r.repo, r.worktree, run, readFile))],
             errors: [],
           };
         } catch (e) {
@@ -78,27 +100,26 @@ export async function featureDiff(
   return { files: results.flatMap((r) => r.files), errors: results.flatMap((r) => r.errors) };
 }
 
-async function untrackedDiff(repo: string, worktree: string, run: Exec): Promise<FileDiffEntry[]> {
+async function untrackedDiff(
+  repo: string,
+  worktree: string,
+  run: Exec,
+  readFile: ReadFile,
+): Promise<FileDiffEntry[]> {
   const listed = await checked(
     run,
     "git",
     ["ls-files", "--others", "--exclude-standard", "-z"],
     worktree,
   );
-  const patches = await Promise.all(
+  return Promise.all(
     listed
       .split("\0")
       .filter(Boolean)
-      .map(async (path) => {
-        const patch = await checked(
-          run,
-          "git",
-          [...GIT_DIFF, "--no-index", "--", "/dev/null", path],
-          worktree,
-          [0, 1],
-        );
-        return patch ? { repo, path, patch } : null;
-      }),
+      .map(async (path) => ({
+        repo,
+        path,
+        patch: untrackedPatch(path, await readFile(join(worktree, path))),
+      })),
   );
-  return patches.filter((p): p is FileDiffEntry => p !== null);
 }

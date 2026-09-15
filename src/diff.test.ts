@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { featureDiff, splitPatch } from "./diff";
+import { featureDiff, splitPatch, untrackedPatch, UNTRACKED_MAX_BYTES } from "./diff";
 import type { Exec } from "./exec";
 
 const patch = [
@@ -90,23 +90,29 @@ describe("featureDiff", () => {
     expect(calls).toContainEqual(["git", [...GIT_DIFF, "abc123"], "/h/.ivar/repos/api/checkout"]);
     expect(calls.some(([, , cwd]) => cwd.includes("/web/"))).toBe(false);
   });
-  it("includes untracked files as new-file patches", async () => {
+  it("includes untracked files as new-file patches without a process per file", async () => {
+    const calls: string[][] = [];
     const run: Exec = async (cmd, args) => {
+      calls.push([cmd, ...args]);
       if (cmd === "ivar") return { code: 0, stderr: "", stdout: status({ repo: "api" }) };
       if (args[0] === "merge-base") return { code: 0, stdout: "abc123\n", stderr: "" };
-      if (args[0] === "ls-files") return { code: 0, stdout: "notes/new.md\0", stderr: "" };
-      if (args.includes("--no-index"))
+      if (args[0] === "ls-files")
         return {
-          code: 1,
+          code: 0,
+          stdout: Array.from({ length: 50 }, (_, i) => `n${i}.md\0`).join(""),
           stderr: "",
-          stdout:
-            "diff --git a/notes/new.md b/notes/new.md\nnew file mode 100644\n--- /dev/null\n+++ b/notes/new.md\n@@ -0,0 +1 @@\n+hi\n",
         };
       return { code: 0, stdout: "", stderr: "" };
     };
-    const { files } = await featureDiff("/h", "checkout", run);
-    expect(files.map((f) => `${f.repo}:${f.path}`)).toEqual(["api:notes/new.md"]);
-    expect(files[0]!.patch.startsWith("diff --git")).toBe(true);
+    const readFile = async (p: string) => Buffer.from(`${p}\n`);
+    const { files } = await featureDiff("/h", "checkout", run, readFile);
+    expect(files).toHaveLength(50);
+    expect(files[0]).toEqual({
+      repo: "api",
+      path: "n0.md",
+      patch: untrackedPatch("n0.md", Buffer.from("/h/.ivar/repos/api/checkout/n0.md\n")),
+    });
+    expect(calls).toHaveLength(4);
   });
   it("reports a failing git command for that repo and keeps the other repos", async () => {
     const run: Exec = async (cmd, args, cwd) => {
@@ -125,21 +131,48 @@ describe("featureDiff", () => {
       { repo: "web", message: expect.stringContaining("Not a valid object name") },
     ]);
   });
-  it("reports a git diff --no-index failure beyond exit 1", async () => {
+  it("reports an unreadable untracked file for that repo", async () => {
     const run: Exec = async (cmd, args) => {
       if (cmd === "ivar") return { code: 0, stderr: "", stdout: status({ repo: "api" }) };
       if (args[0] === "merge-base") return { code: 0, stdout: "abc\n", stderr: "" };
       if (args[0] === "ls-files") return { code: 0, stdout: "n.md\0", stderr: "" };
-      if (args.includes("--no-index"))
-        return { code: 2, stdout: "", stderr: "error: could not access" };
       return { code: 0, stdout: "", stderr: "" };
     };
-    expect((await featureDiff("/h", "checkout", run)).errors).toEqual([
-      { repo: "api", message: expect.stringContaining("could not access") },
+    const readFile = async () => {
+      throw new Error("EACCES: permission denied, open 'n.md'");
+    };
+    expect((await featureDiff("/h", "checkout", run, readFile)).errors).toEqual([
+      { repo: "api", message: expect.stringContaining("permission denied") },
     ]);
   });
   it("throws when ivar feature status fails", async () => {
     const run: Exec = async () => ({ code: 1, stdout: "", stderr: "feature `x` does not exist" });
     await expect(featureDiff("/h", "x", run)).rejects.toThrow("does not exist");
+  });
+});
+
+describe("untrackedPatch", () => {
+  it("matches git's new-file hunk for text ending in a newline", () => {
+    expect(untrackedPatch("notes/new.md", Buffer.from("hi\nthere\n"))).toBe(
+      "diff --git a/notes/new.md b/notes/new.md\nnew file mode 100644\n--- /dev/null\n+++ b/notes/new.md\n@@ -0,0 +1,2 @@\n+hi\n+there\n",
+    );
+  });
+  it("marks a missing trailing newline", () => {
+    expect(untrackedPatch("a.txt", Buffer.from("x"))).toBe(
+      "diff --git a/a.txt b/a.txt\nnew file mode 100644\n--- /dev/null\n+++ b/a.txt\n@@ -0,0 +1 @@\n+x\n\\ No newline at end of file\n",
+    );
+  });
+  it("renders binary and oversized files without their content", () => {
+    expect(untrackedPatch("i.png", Buffer.from([0x89, 0, 1]))).toBe(
+      "diff --git a/i.png b/i.png\nnew file mode 100644\nBinary files /dev/null and b/i.png differ\n",
+    );
+    expect(untrackedPatch("big.log", Buffer.alloc(UNTRACKED_MAX_BYTES + 1, 97))).toBe(
+      "diff --git a/big.log b/big.log\nnew file mode 100644\nBinary files /dev/null and b/big.log differ\n",
+    );
+  });
+  it("keeps an empty file addressable by its header path", () => {
+    expect(
+      splitPatch("api", untrackedPatch("empty.txt", Buffer.alloc(0))).map((f) => f.path),
+    ).toEqual(["empty.txt"]);
   });
 });
