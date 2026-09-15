@@ -1,4 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { addComment, listComments, resolveComment, sendToThreads, type SpawnThread } from "./comments.js";
 import { featureDiff } from "./diff.js";
 import { exec, fsExists } from "./exec.js";
 import { findHallRoot, getHall, runIvar } from "./hall.js";
@@ -22,5 +23,16 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     "hall.get": async ({ projectId }) => getHall((await projectSource(projectId)).path, exec, fsExists),
     "hall.run": async ({ projectId, command, args }) => runIvar(await hallRoot(projectId), command, args, exec),
     "feature.diff": async ({ projectId, feature }) => ({ files: await featureDiff(await hallRoot(projectId), feature, exec) }),
+    "comments.list": async ({ projectId, feature }) => ({ comments: await listComments(await hallRoot(projectId), feature, exec) }),
+    "comments.add": async ({ projectId, feature, ...input }) => addComment(await hallRoot(projectId), feature, input, exec),
+    "comments.resolve": async ({ projectId, feature, id }) => resolveComment(await hallRoot(projectId), feature, id, exec),
+    "comments.send": async ({ projectId, feature }) => {
+      const source = await projectSource(projectId);
+      const spawn: SpawnThread = ({ worktree, prompt, title }) =>
+        bb.sdk.threads
+          .spawn({ projectId, prompt, title, environment: { type: "host", hostId: source.hostId, workspace: { type: "unmanaged", path: worktree } } })
+          .then((thread) => ({ threadId: thread.id }));
+      return { threads: await sendToThreads(await hallRoot(projectId), feature, exec, spawn) };
+    },
   });
 }
