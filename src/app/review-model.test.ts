@@ -1,8 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  commentsByFile,
   countChanges,
   errorMessage,
+  estimatedDiffHeight,
+  fileKey,
   groupByRepo,
+  reuseIfEqual,
+  reuseUnchangedGroups,
+  reuseUnchangedFiles,
   toAnnotations,
   toCommentRange,
   toggleKey,
@@ -28,11 +34,9 @@ describe("groupByRepo", () => {
 });
 
 describe("toAnnotations", () => {
-  it("anchors open and resolved comments of this repo and file at their last line on the new side", () => {
-    const anns = toAnnotations(file("api", "a"), [
+  it("anchors open and resolved comments at their last line on the new side", () => {
+    const anns = toAnnotations([
       comment("c1", "api", "a", 7),
-      comment("c2", "api", "b", 2),
-      comment("c3", "web", "a", 4),
       comment("c4", "api", "a", 9, "resolved"),
     ]);
     expect(anns.map((a) => [a.lineNumber, a.metadata.id])).toEqual([
@@ -92,5 +96,98 @@ describe("countChanges", () => {
     const patch =
       "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n ctx\n-old\n+new\n+more\n";
     expect(countChanges(patch)).toEqual({ additions: 2, deletions: 1 });
+  });
+});
+
+describe("fileKey", () => {
+  it("joins repo and path", () => expect(fileKey(file("api", "src/a.ts"))).toBe("api\0src/a.ts"));
+  it("does not collide when a slash moves between repo and path", () =>
+    expect(fileKey({ repo: "a", path: "b/c" })).not.toBe(fileKey({ repo: "a/b", path: "c" })));
+});
+
+describe("reuseUnchangedFiles", () => {
+  const entry = (path: string, patch: string) => ({ repo: "api", path, patch });
+  it("returns the previous array when every patch is unchanged", () => {
+    const previous = [entry("a", "p1"), entry("b", "p2")];
+    expect(reuseUnchangedFiles(previous, [entry("a", "p1"), entry("b", "p2")])).toBe(previous);
+  });
+  it("keeps unchanged entries by identity and takes changed or new ones in the latest order", () => {
+    const a = entry("a", "p1");
+    const changedB = entry("b", "p2-edited");
+    const newC = { repo: "web", path: "c", patch: "p3" };
+    const next = reuseUnchangedFiles([a, entry("b", "p2")], [newC, entry("a", "p1"), changedB]);
+    expect(next).toHaveLength(3);
+    expect(next[0]).toBe(newC);
+    expect(next[1]).toBe(a);
+    expect(next[2]).toBe(changedB);
+  });
+  it("drops files that are gone", () => {
+    const a = entry("a", "p1");
+    const next = reuseUnchangedFiles([a, entry("b", "p2")], [entry("a", "p1")]);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toBe(a);
+  });
+});
+
+describe("reuseIfEqual", () => {
+  it("keeps the previous value only when the next one has the same content", () => {
+    const previous = [comment("1", "api", "a", 3)];
+    expect(reuseIfEqual(previous, [comment("1", "api", "a", 3)])).toBe(previous);
+    const resolved = [comment("1", "api", "a", 3, "resolved")];
+    expect(reuseIfEqual(previous, resolved)).toBe(resolved);
+  });
+});
+
+describe("commentsByFile", () => {
+  it("groups comments under their repo/file key in their original order", () => {
+    const byFile = commentsByFile([
+      comment("1", "api", "a", 1),
+      comment("2", "web", "a", 2),
+      comment("3", "api", "a", 4),
+    ]);
+    expect(byFile.get(fileKey(file("api", "a")))?.map((c) => c.id)).toEqual(["1", "3"]);
+    expect(byFile.get(fileKey(file("web", "a")))?.map((c) => c.id)).toEqual(["2"]);
+    expect(byFile.get(fileKey(file("api", "missing")))).toBeUndefined();
+  });
+  it("keeps files apart when a slash moves between repo and path", () => {
+    const byFile = commentsByFile([comment("1", "a", "b/c", 1), comment("2", "a/b", "c", 1)]);
+    expect(byFile.size).toBe(2);
+    expect(byFile.get(fileKey({ repo: "a", path: "b/c" }))?.map((c) => c.id)).toEqual(["1"]);
+    expect(byFile.get(fileKey({ repo: "a/b", path: "c" }))?.map((c) => c.id)).toEqual(["2"]);
+  });
+});
+
+describe("reuseUnchangedGroups", () => {
+  it("keeps unchanged groups by identity, takes changed ones and drops removed keys", () => {
+    const unchanged = [comment("1", "api", "a", 1)];
+    const previous = new Map([
+      ["api/a", unchanged],
+      ["api/b", [comment("2", "api", "b", 2)]],
+      ["api/gone", [comment("3", "api", "gone", 3)]],
+    ]);
+    const changedB = [comment("2", "api", "b", 2, "resolved")];
+    const next = reuseUnchangedGroups(
+      previous,
+      new Map([
+        ["api/a", [comment("1", "api", "a", 1)]],
+        ["api/b", changedB],
+      ]),
+    );
+    expect(next.get("api/a")).toBe(unchanged);
+    expect(next.get("api/b")).toBe(changedB);
+    expect(next.has("api/gone")).toBe(false);
+    expect([...next.keys()]).toEqual(["api/a", "api/b"]);
+  });
+});
+
+describe("estimatedDiffHeight", () => {
+  it("scales with hunk lines and ignores the file header", () => {
+    const patch = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,3 @@\n a\n-b\n+c\n+d\n";
+    expect(estimatedDiffHeight(patch)).toBe(5 * 20);
+  });
+  it("reserves one line for a patch without hunks", () => {
+    expect(estimatedDiffHeight("diff --git a/x b/x\nBinary files /dev/null and b/x differ\n")).toBe(
+      20,
+    );
   });
 });

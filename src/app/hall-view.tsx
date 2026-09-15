@@ -1,10 +1,23 @@
 import { useCallback, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { ivarRpcContract } from "../rpc.js";
 import type { HallCommand } from "../hall.js";
 import type { ExecResult as RunResult } from "../exec.js";
 import type { HallView as HallData } from "../schemas.js";
 import { hallSummary } from "./hall-model.js";
+import { reuseIfEqual } from "./review-model.js";
 import { usePolling } from "./use-polling.js";
 
 export function HallView({ projectId }: { projectId: string }) {
@@ -19,7 +32,7 @@ export function HallView({ projectId }: { projectId: string }) {
     () =>
       rpc.call("hall.get", { projectId }).then(
         (h) => {
-          setHall(h);
+          setHall((previous) => (previous ? reuseIfEqual(previous, h) : h));
           setError(null);
         },
         (e: Error) => setError(e.message),
@@ -38,110 +51,129 @@ export function HallView({ projectId }: { projectId: string }) {
     await refresh();
   };
 
-  if (!hall) return <div style={{ padding: 16 }}>{error ?? "Loading…"}</div>;
+  if (!hall) return <p className="p-4 text-sm text-muted-foreground">{error ?? "Loading…"}</p>;
   const summary = hallSummary(hall);
 
   return (
-    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0 }}>{summary.title}</h2>
-        {!summary.empty && <button onClick={() => run({ command: "sync" })}>sync</button>}
+    <div className="flex flex-col gap-4 p-4 text-sm text-foreground">
+      <header className="flex items-center justify-between gap-2">
+        <h2 className="m-0 truncate text-sm font-semibold">{summary.title}</h2>
+        {!summary.empty && (
+          <Button variant="outline" size="sm" onClick={() => run({ command: "sync" })}>
+            Sync
+          </Button>
+        )}
       </header>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="m-0 text-destructive">
+          {error}
+        </p>
+      )}
       {summary.empty ? (
-        <p>{summary.empty}</p>
+        <p className="m-0 text-muted-foreground">{summary.empty}</p>
       ) : (
         <>
-          <section>
-            <h3>Repos</h3>
-            <ul>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Repos</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-1">
               {summary.repos.map((repo) => (
-                <li key={repo}>{repo}</li>
+                <Badge key={repo} variant="secondary">
+                  {repo}
+                </Badge>
               ))}
-            </ul>
-          </section>
-          <section>
-            <h3>Features</h3>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (newFeature.trim())
-                  void run({ command: "feature create", name: newFeature.trim() }).then(() =>
-                    setNewFeature(""),
-                  );
-              }}
-            >
-              <input
-                value={newFeature}
-                onChange={(e) => setNewFeature(e.target.value)}
-                placeholder="New feature"
-              />
-              <button type="submit">Create</button>
-            </form>
-            <table style={{ borderSpacing: "12px 4px" }}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Promoted</th>
-                  <th>Promote</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {summary.features.map((feature) => (
-                  <tr key={feature.name}>
-                    <td>{feature.name}</td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {feature.promoted.map((repo) => (
-                          <span
-                            key={repo}
-                            style={{
-                              padding: "0 6px",
-                              border: "1px solid currentColor",
-                              borderRadius: 10,
-                            }}
-                          >
-                            {repo}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {summary.repos
-                          .filter((repo) => !feature.promoted.includes(repo))
-                          .map((repo) => (
-                            <button
-                              key={repo}
-                              onClick={() =>
-                                run({ command: "promote", feature: feature.name, repo })
-                              }
-                            >
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-sm">Features</CardTitle>
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (newFeature.trim())
+                    void run({ command: "feature create", name: newFeature.trim() }).then(() =>
+                      setNewFeature(""),
+                    );
+                }}
+              >
+                <Input
+                  className="h-8 w-48"
+                  value={newFeature}
+                  onChange={(e) => setNewFeature(e.target.value)}
+                  placeholder="New feature"
+                  aria-label="New feature"
+                />
+                <Button type="submit" size="sm">
+                  Create
+                </Button>
+              </form>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Promoted</TableHead>
+                    <TableHead>Promote</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {summary.features.map((feature) => (
+                    <TableRow key={feature.name}>
+                      <TableCell className="font-medium">{feature.name}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {feature.promoted.map((repo) => (
+                            <Badge key={repo} variant="outline">
                               {repo}
-                            </button>
+                            </Badge>
                           ))}
-                      </div>
-                    </td>
-                    <td>
-                      <button
-                        onClick={() =>
-                          navigate.toPluginPanel("ivar", {
-                            subPath: `${encodeURIComponent(projectId)}/${feature.href}`,
-                          })
-                        }
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {summary.repos
+                            .filter((repo) => !feature.promoted.includes(repo))
+                            .map((repo) => (
+                              <Button
+                                key={repo}
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  run({ command: "promote", feature: feature.name, repo })
+                                }
+                              >
+                                + {repo}
+                              </Button>
+                            ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            navigate.toPluginPanel("ivar", {
+                              subPath: `${encodeURIComponent(projectId)}/${feature.href}`,
+                            })
+                          }
+                        >
+                          Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </>
       )}
-      {lastRun && <pre>{`exit ${lastRun.code}\n${lastRun.stdout}${lastRun.stderr}`}</pre>}
+      {lastRun && (
+        <pre className="m-0 overflow-auto rounded-md border border-border bg-muted p-2 text-xs">{`exit ${lastRun.code}\n${lastRun.stdout}${lastRun.stderr}`}</pre>
+      )}
     </div>
   );
 }

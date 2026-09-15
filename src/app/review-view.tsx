@@ -1,14 +1,24 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
+import { Button } from "@/components/ui/button";
 import type { ivarRpcContract } from "../rpc.js";
 import type { FileDiffEntry, RepoDiffError } from "../diff.js";
 import type { ReviewComment } from "../schemas.js";
 import { IvarFileDiff } from "./file-diff.js";
-import { errorMessage, groupByRepo, toggleKey } from "./review-model.js";
-import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
+import {
+  commentsByFile,
+  errorMessage,
+  fileKey,
+  groupByRepo,
+  reuseIfEqual,
+  reuseUnchangedFiles,
+  reuseUnchangedGroups,
+  toggleKey,
+  type CommentRange,
+} from "./review-model.js";
 import { usePolling } from "./use-polling.js";
 
-const keyOf = (file: FileDiffEntry) => `${file.repo}/${file.path}`;
+const noComments: ReviewComment[] = [];
 
 export function ReviewView({ projectId, feature }: { projectId: string; feature: string }) {
   const rpc = useRpc<typeof ivarRpcContract>();
@@ -24,13 +34,13 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   const [showResolved, setShowResolved] = useState(false);
   const [rejectedKey, setRejectedKey] = useState<string | null>(null);
 
-  const reportCommentsError = (e: unknown) => setCommentsError(errorMessage(e));
+  const reportCommentsError = useCallback((e: unknown) => setCommentsError(errorMessage(e)), []);
   const refreshDiff = useCallback(
     () =>
       rpc.call("feature.diff", { projectId, feature }).then(
         (r) => {
-          setFiles(r.files);
-          setRepoErrors(r.errors);
+          setFiles((previous) => reuseUnchangedFiles(previous, r.files));
+          setRepoErrors((previous) => reuseIfEqual(previous, r.errors));
           setDiffError(null);
         },
         (e: unknown) => setDiffError(errorMessage(e)),
@@ -41,7 +51,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
     () =>
       rpc.call("comments.list", { projectId, feature }).then(
         (r) => {
-          setComments(r.comments);
+          setComments((previous) => reuseIfEqual(previous, r.comments));
           setCommentsError(null);
         },
         (e: unknown) => setCommentsError(errorMessage(e)),
@@ -51,22 +61,33 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   usePolling(refreshDiff, 5000);
   usePolling(refreshComments, 2000);
 
-  const addComment = (file: FileDiffEntry, range: { start: number; end: number }, body: string) =>
-    rpc
-      .call("comments.add", {
-        projectId,
-        feature,
-        repo: file.repo,
-        file: file.path,
-        lineStart: range.start,
-        lineEnd: range.end,
-        body,
-      })
-      .then(refreshComments, reportCommentsError);
-  const resolve = (id: string) =>
-    rpc
-      .call("comments.resolve", { projectId, feature, id })
-      .then(refreshComments, reportCommentsError);
+  const toggle = useCallback((key: string) => setCollapsed((keys) => toggleKey(keys, key)), []);
+  const select = useCallback(
+    (key: string, rejected: boolean) => setRejectedKey(rejected ? key : null),
+    [],
+  );
+  const addComment = useCallback(
+    (file: FileDiffEntry, range: CommentRange, body: string) =>
+      void rpc
+        .call("comments.add", {
+          projectId,
+          feature,
+          repo: file.repo,
+          file: file.path,
+          lineStart: range.start,
+          lineEnd: range.end,
+          body,
+        })
+        .then(refreshComments, reportCommentsError),
+    [rpc, projectId, feature, refreshComments, reportCommentsError],
+  );
+  const resolve = useCallback(
+    (id: string) =>
+      void rpc
+        .call("comments.resolve", { projectId, feature, id })
+        .then(refreshComments, reportCommentsError),
+    [rpc, projectId, feature, refreshComments, reportCommentsError],
+  );
   const send = () =>
     rpc
       .call("comments.send", { projectId, feature })
@@ -74,88 +95,105 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
 
   const openCount = comments.filter((c) => c.status === "open").length;
   const resolvedCount = comments.length - openCount;
-  const visibleComments = showResolved ? comments : comments.filter((c) => c.status === "open");
-  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(keyOf(f)));
+  const visibleComments = useMemo(
+    () => (showResolved ? comments : comments.filter((c) => c.status === "open")),
+    [comments, showResolved],
+  );
+  const [byFile, setByFile] = useState(() => commentsByFile(visibleComments));
+  const [groupedComments, setGroupedComments] = useState(visibleComments);
+  if (groupedComments !== visibleComments) {
+    setGroupedComments(visibleComments);
+    setByFile((previous) => reuseUnchangedGroups(previous, commentsByFile(visibleComments)));
+  }
+  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(fileKey(f)));
 
   return (
-    <div className="flex flex-col text-sm text-[var(--foreground)]">
-      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-[var(--border)] bg-[var(--background)] px-4 py-2">
-        <button
-          className={buttonClass}
+    <div className="flex flex-col text-sm text-foreground">
+      <header className="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-border bg-background px-4 py-2">
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => navigate.toPluginPanel("ivar", { subPath: encodeURIComponent(projectId) })}
         >
           ← Back
-        </button>
+        </Button>
         <h2 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold">
-          {feature} <span className={`${mutedTextClass} font-normal`}>{files.length} files</span>
+          {feature}{" "}
+          <span className="text-xs font-normal text-muted-foreground">{files.length} files</span>
         </h2>
         <div className="inline-flex" role="group" aria-label="Diff style">
           {(["unified", "split"] as const).map((style) => (
-            <button
+            <Button
               key={style}
-              className={`${buttonClass} capitalize first:rounded-r-none last:-ml-px last:rounded-l-none`}
+              variant="outline"
+              size="sm"
+              className="capitalize first:rounded-r-none last:-ml-px last:rounded-l-none aria-pressed:bg-accent"
               aria-pressed={view === style}
               onClick={() => setView(style)}
             >
               {style}
-            </button>
+            </Button>
           ))}
         </div>
-        <button
-          className={buttonClass}
+        <Button
+          variant="outline"
+          size="sm"
           disabled={files.length === 0}
-          onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(files.map(keyOf)))}
+          onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(files.map(fileKey)))}
         >
           {allCollapsed ? "Expand all" : "Collapse all"}
-        </button>
-        <button
-          className={buttonClass}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="aria-pressed:bg-accent"
           aria-pressed={showResolved}
           disabled={resolvedCount === 0}
           onClick={() => setShowResolved(!showResolved)}
         >
           {showResolved ? "Hide" : "Show"} resolved ({resolvedCount})
-        </button>
-        <button className={primaryButtonClass} disabled={openCount === 0} onClick={send}>
+        </Button>
+        <Button size="sm" disabled={openCount === 0} onClick={send}>
           Send {openCount} open to bb threads
-        </button>
+        </Button>
       </header>
       <div className="flex flex-col gap-4 p-4">
         {diffError && (
-          <p role="alert" className="m-0 text-[var(--destructive-text)]">
+          <p role="alert" className="m-0 text-destructive">
             {diffError}
           </p>
         )}
         {commentsError && (
-          <p role="alert" className="m-0 text-[var(--destructive-text)]">
+          <p role="alert" className="m-0 text-destructive">
             {commentsError}
           </p>
         )}
         {threads.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className={mutedTextClass}>Threads:</span>
+            <span className="text-xs text-muted-foreground">Threads:</span>
             {threads.map((t) => (
-              <button
+              <Button
                 key={t.threadId}
-                className={buttonClass}
+                variant="outline"
+                size="sm"
                 onClick={() => navigate.toThread(t.threadId)}
               >
                 {t.repo}
-              </button>
+              </Button>
             ))}
           </div>
         )}
         {repoErrors.map((e) => (
-          <p key={e.repo} role="alert" className="m-0 text-[var(--destructive-text)]">
+          <p key={e.repo} role="alert" className="m-0 text-destructive">
             {e.repo}: {e.message}
           </p>
         ))}
         {files.length === 0 && repoErrors.length === 0 && (
-          <p className={mutedTextClass}>No changes.</p>
+          <p className="text-xs text-muted-foreground">No changes.</p>
         )}
         {groupByRepo(files).map((group) => (
           <section key={group.repo} className="flex flex-col gap-2">
-            <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-[var(--muted-foreground)]">
+            <h3 className="m-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {group.repo} <span className="font-normal">· {group.files.length} files</span>
             </h3>
             {group.files.map((file) => (
@@ -163,13 +201,13 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
                 key={file.path}
                 file={file}
                 view={view}
-                comments={visibleComments}
-                collapsed={collapsed.has(keyOf(file))}
-                rejected={rejectedKey === keyOf(file)}
-                onToggle={() => setCollapsed((keys) => toggleKey(keys, keyOf(file)))}
-                onSelection={(rejected) => setRejectedKey(rejected ? keyOf(file) : null)}
-                onAdd={(range, body) => void addComment(file, range, body)}
-                onResolve={(id) => void resolve(id)}
+                comments={byFile.get(fileKey(file)) ?? noComments}
+                collapsed={collapsed.has(fileKey(file))}
+                rejected={rejectedKey === fileKey(file)}
+                onToggle={toggle}
+                onSelection={select}
+                onAdd={addComment}
+                onResolve={resolve}
               />
             ))}
           </section>
