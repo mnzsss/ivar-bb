@@ -1,4 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { featureDiff } from "./diff.js";
 import { exec, fsExists } from "./exec.js";
 import { findHallRoot, getHall, runIvar } from "./hall.js";
 import { ivarRpcContract } from "./rpc.js";
@@ -20,5 +21,6 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
     ping: async () => ({ ok: true as const }),
     "hall.get": async ({ projectId }) => getHall((await projectSource(projectId)).path, exec, fsExists),
     "hall.run": async ({ projectId, command, args }) => runIvar(await hallRoot(projectId), command, args, exec),
+    "feature.diff": async ({ projectId, feature }) => ({ files: await featureDiff(await hallRoot(projectId), feature, exec) }),
   });
 }

@@ -20,6 +20,10 @@ export const ivarRpcContract = defineRpcContract({
       z.object({ status: z.literal("ivar-missing") }),
     ]),
   },
+  "feature.diff": {
+    input: projectInput.extend({ feature: z.string() }),
+    output: z.object({ files: z.array(z.object({ repo: z.string(), path: z.string(), patch: z.string() })) }),
+  },
   "hall.run": {
     input: projectInput.extend({ command: z.enum(ALLOWED_COMMANDS), args: z.array(z.string()) }),
     output: execResult,
