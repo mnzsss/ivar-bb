@@ -63,22 +63,27 @@ export function HallView({ projectId }: { projectId: string }) {
               <input value={newFeature} onChange={(e) => setNewFeature(e.target.value)} placeholder="New feature" />
               <button type="submit">Create</button>
             </form>
-            <table>
+            <table style={{ borderSpacing: "12px 4px" }}>
               <thead>
-                <tr><th>Name</th><th>Repos</th><th /></tr>
+                <tr><th>Name</th><th>Promoted</th><th>Promote</th><th /></tr>
               </thead>
               <tbody>
                 {summary.features.map((feature) => (
                   <tr key={feature.name}>
                     <td>{feature.name}</td>
                     <td>
-                      {summary.repos.map((repo) =>
-                        feature.promoted.includes(repo) ? (
-                          <span key={repo} style={{ marginRight: 6 }}>{repo}</span>
-                        ) : (
-                          <button key={repo} onClick={() => run("promote", [feature.name, repo])}>Promote {repo}</button>
-                        ),
-                      )}
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {feature.promoted.map((repo) => (
+                          <span key={repo} style={{ padding: "0 6px", border: "1px solid currentColor", borderRadius: 10 }}>{repo}</span>
+                        ))}
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {summary.repos.filter((repo) => !feature.promoted.includes(repo)).map((repo) => (
+                          <button key={repo} onClick={() => run("promote", [feature.name, repo])}>{repo}</button>
+                        ))}
+                      </div>
                     </td>
                     <td>
                       <button onClick={() => navigate.toPluginPanel("ivar", { subPath: `${encodeURIComponent(projectId)}/${feature.href}` })}>Review</button>
