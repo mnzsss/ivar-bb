@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  commentsByFile,
   countChanges,
   errorMessage,
   fileKey,
@@ -132,5 +133,18 @@ describe("reuseIfEqual", () => {
     expect(reuseIfEqual(previous, [comment("1", "api", "a", 3)])).toBe(previous);
     const resolved = [comment("1", "api", "a", 3, "resolved")];
     expect(reuseIfEqual(previous, resolved)).toBe(resolved);
+  });
+});
+
+describe("commentsByFile", () => {
+  it("groups comments under their repo/file key in their original order", () => {
+    const byFile = commentsByFile([
+      comment("1", "api", "a", 1),
+      comment("2", "web", "a", 2),
+      comment("3", "api", "a", 4),
+    ]);
+    expect(byFile.get(fileKey(file("api", "a")))?.map((c) => c.id)).toEqual(["1", "3"]);
+    expect(byFile.get(fileKey(file("web", "a")))?.map((c) => c.id)).toEqual(["2"]);
+    expect(byFile.get("api/missing")).toBeUndefined();
   });
 });

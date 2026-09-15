@@ -1,9 +1,15 @@
-import { useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { FileDiff } from "@pierre/diffs/react";
-import { parsePatchFiles } from "@pierre/diffs";
+import { parsePatchFiles, type DiffLineAnnotation, type SelectedLineRange } from "@pierre/diffs";
 import type { FileDiffEntry } from "../diff.js";
 import type { ReviewComment } from "../schemas.js";
-import { countChanges, toAnnotations, toCommentRange, type CommentRange } from "./review-model.js";
+import {
+  countChanges,
+  fileKey,
+  toAnnotations,
+  toCommentRange,
+  type CommentRange,
+} from "./review-model.js";
 import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
 
 function CommentCard({
@@ -64,7 +70,19 @@ function CommentForm({ onSubmit, onCancel }: { onSubmit(body: string): void; onC
   );
 }
 
-export function IvarFileDiff({
+type IvarFileDiffProps = {
+  file: FileDiffEntry;
+  view: "unified" | "split";
+  comments: ReviewComment[];
+  collapsed: boolean;
+  rejected: boolean;
+  onToggle(key: string): void;
+  onSelection(key: string, rejected: boolean): void;
+  onAdd(file: FileDiffEntry, range: CommentRange, body: string): void;
+  onResolve(id: string): void;
+};
+
+export const IvarFileDiff = memo(function IvarFileDiff({
   file,
   view,
   comments,
@@ -74,18 +92,44 @@ export function IvarFileDiff({
   onSelection,
   onAdd,
   onResolve,
-}: {
-  file: FileDiffEntry;
-  view: "unified" | "split";
-  comments: ReviewComment[];
-  collapsed: boolean;
-  rejected: boolean;
-  onToggle(): void;
-  onSelection(rejected: boolean): void;
-  onAdd(range: CommentRange, body: string): void;
-  onResolve(id: string): void;
-}) {
+}: IvarFileDiffProps) {
+  const key = fileKey(file);
   const [range, setRange] = useState<CommentRange | null>(null);
+  const options = useMemo(
+    () => ({
+      diffStyle: view,
+      disableFileHeader: true,
+      enableLineSelection: true,
+      onLineSelected: (r: SelectedLineRange | null) => {
+        const selection = toCommentRange(r);
+        onSelection(key, selection?.kind === "rejected");
+        setRange(selection?.kind === "range" ? selection : null);
+      },
+    }),
+    [view, key, onSelection],
+  );
+  const lineAnnotations = useMemo(
+    () => [
+      ...toAnnotations(file, comments),
+      ...(range ? [{ side: range.side, lineNumber: range.end, metadata: null }] : []),
+    ],
+    [file, comments, range],
+  );
+  const renderAnnotation = useCallback(
+    (a: DiffLineAnnotation<ReviewComment | null>) =>
+      a.metadata ? (
+        <CommentCard comment={a.metadata} onResolve={onResolve} />
+      ) : range ? (
+        <CommentForm
+          onSubmit={(body) => {
+            onAdd(file, range, body);
+            setRange(null);
+          }}
+          onCancel={() => setRange(null)}
+        />
+      ) : null,
+    [file, range, onAdd, onResolve],
+  );
   const fileDiff = useMemo(
     () => parsePatchFiles(file.patch, undefined, false)[0]?.files[0],
     [file.patch],
@@ -98,7 +142,7 @@ export function IvarFileDiff({
         <button
           className="flex min-w-0 flex-1 items-center gap-2 bg-transparent text-left text-[var(--foreground)]"
           aria-expanded={!collapsed}
-          onClick={onToggle}
+          onClick={() => onToggle(key)}
         >
           <span className="w-3 text-[var(--muted-foreground)]">{collapsed ? "▸" : "▾"}</span>
           <span className="truncate font-mono">{file.path}</span>
@@ -117,36 +161,12 @@ export function IvarFileDiff({
       ) : (
         <FileDiff<ReviewComment | null, undefined>
           fileDiff={fileDiff}
-          options={{
-            diffStyle: view,
-            disableFileHeader: true,
-            enableLineSelection: true,
-            onLineSelected: (r) => {
-              const selection = toCommentRange(r);
-              onSelection(selection?.kind === "rejected");
-              setRange(selection?.kind === "range" ? selection : null);
-            },
-          }}
+          options={options}
           selectedLines={range}
-          lineAnnotations={[
-            ...toAnnotations(file, comments),
-            ...(range ? [{ side: range.side, lineNumber: range.end, metadata: null }] : []),
-          ]}
-          renderAnnotation={(a) =>
-            a.metadata ? (
-              <CommentCard comment={a.metadata} onResolve={onResolve} />
-            ) : range ? (
-              <CommentForm
-                onSubmit={(body) => {
-                  onAdd(range, body);
-                  setRange(null);
-                }}
-                onCancel={() => setRange(null)}
-              />
-            ) : null
-          }
+          lineAnnotations={lineAnnotations}
+          renderAnnotation={renderAnnotation}
         />
       )}
     </div>
   );
-}
+});

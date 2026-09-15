@@ -1,19 +1,23 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { ivarRpcContract } from "../rpc.js";
 import type { FileDiffEntry, RepoDiffError } from "../diff.js";
 import type { ReviewComment } from "../schemas.js";
 import { IvarFileDiff } from "./file-diff.js";
 import {
+  commentsByFile,
   errorMessage,
   fileKey,
   groupByRepo,
   reuseIfEqual,
   reuseUnchangedFiles,
   toggleKey,
+  type CommentRange,
 } from "./review-model.js";
 import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
 import { usePolling } from "./use-polling.js";
+
+const noComments: ReviewComment[] = [];
 
 export function ReviewView({ projectId, feature }: { projectId: string; feature: string }) {
   const rpc = useRpc<typeof ivarRpcContract>();
@@ -29,7 +33,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   const [showResolved, setShowResolved] = useState(false);
   const [rejectedKey, setRejectedKey] = useState<string | null>(null);
 
-  const reportCommentsError = (e: unknown) => setCommentsError(errorMessage(e));
+  const reportCommentsError = useCallback((e: unknown) => setCommentsError(errorMessage(e)), []);
   const refreshDiff = useCallback(
     () =>
       rpc.call("feature.diff", { projectId, feature }).then(
@@ -56,22 +60,33 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   usePolling(refreshDiff, 5000);
   usePolling(refreshComments, 2000);
 
-  const addComment = (file: FileDiffEntry, range: { start: number; end: number }, body: string) =>
-    rpc
-      .call("comments.add", {
-        projectId,
-        feature,
-        repo: file.repo,
-        file: file.path,
-        lineStart: range.start,
-        lineEnd: range.end,
-        body,
-      })
-      .then(refreshComments, reportCommentsError);
-  const resolve = (id: string) =>
-    rpc
-      .call("comments.resolve", { projectId, feature, id })
-      .then(refreshComments, reportCommentsError);
+  const toggle = useCallback((key: string) => setCollapsed((keys) => toggleKey(keys, key)), []);
+  const select = useCallback(
+    (key: string, rejected: boolean) => setRejectedKey(rejected ? key : null),
+    [],
+  );
+  const addComment = useCallback(
+    (file: FileDiffEntry, range: CommentRange, body: string) =>
+      void rpc
+        .call("comments.add", {
+          projectId,
+          feature,
+          repo: file.repo,
+          file: file.path,
+          lineStart: range.start,
+          lineEnd: range.end,
+          body,
+        })
+        .then(refreshComments, reportCommentsError),
+    [rpc, projectId, feature, refreshComments, reportCommentsError],
+  );
+  const resolve = useCallback(
+    (id: string) =>
+      void rpc
+        .call("comments.resolve", { projectId, feature, id })
+        .then(refreshComments, reportCommentsError),
+    [rpc, projectId, feature, refreshComments, reportCommentsError],
+  );
   const send = () =>
     rpc
       .call("comments.send", { projectId, feature })
@@ -79,7 +94,11 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
 
   const openCount = comments.filter((c) => c.status === "open").length;
   const resolvedCount = comments.length - openCount;
-  const visibleComments = showResolved ? comments : comments.filter((c) => c.status === "open");
+  const visibleComments = useMemo(
+    () => (showResolved ? comments : comments.filter((c) => c.status === "open")),
+    [comments, showResolved],
+  );
+  const byFile = useMemo(() => commentsByFile(visibleComments), [visibleComments]);
   const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(fileKey(f)));
 
   return (
@@ -168,13 +187,13 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
                 key={file.path}
                 file={file}
                 view={view}
-                comments={visibleComments}
+                comments={byFile.get(fileKey(file)) ?? noComments}
                 collapsed={collapsed.has(fileKey(file))}
                 rejected={rejectedKey === fileKey(file)}
-                onToggle={() => setCollapsed((keys) => toggleKey(keys, fileKey(file)))}
-                onSelection={(rejected) => setRejectedKey(rejected ? fileKey(file) : null)}
-                onAdd={(range, body) => void addComment(file, range, body)}
-                onResolve={(id) => void resolve(id)}
+                onToggle={toggle}
+                onSelection={select}
+                onAdd={addComment}
+                onResolve={resolve}
               />
             ))}
           </section>

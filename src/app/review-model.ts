@@ -26,6 +26,15 @@ export function groupByRepo(files: FileDiffEntry[]) {
   return [...groups].map(([repo, repoFiles]) => ({ repo, files: repoFiles }));
 }
 
+export function commentsByFile(comments: ReviewComment[]) {
+  const groups = new Map<string, ReviewComment[]>();
+  for (const c of comments) {
+    const key = fileKey({ repo: c.repo, path: c.file });
+    groups.set(key, [...(groups.get(key) ?? []), c]);
+  }
+  return groups;
+}
+
 export const toAnnotations = (file: FileDiffEntry, comments: ReviewComment[]) =>
   comments
     .filter((c) => c.repo === file.repo && c.file === file.path)
