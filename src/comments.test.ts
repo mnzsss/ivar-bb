@@ -25,6 +25,10 @@ describe("buildThreadPrompt", () => {
     expect(prompt).toContain("fix c1");
     expect(prompt).toContain("ivar review comment resolve checkout c1");
   });
+  it("uses the given ivar binary path in resolve commands", () => {
+    const prompt = buildThreadPrompt("checkout", "api", [open("c1", "api")], "/abs/path/ivar");
+    expect(prompt).toContain("`/abs/path/ivar review comment resolve checkout c1`");
+  });
 });
 
 describe("sendToThreads", () => {

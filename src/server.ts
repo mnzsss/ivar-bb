@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { addComment, listComments, resolveComment, sendToThreads, type SpawnThread } from "./comments.js";
 import { featureDiff } from "./diff.js";
-import { exec, fsExists } from "./exec.js";
+import { exec, fsExists, resolveBinary } from "./exec.js";
 import { findHallRoot, getHall, runIvar } from "./hall.js";
 import { ivarRpcContract } from "./rpc.js";
 
@@ -32,7 +32,7 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
         bb.sdk.threads
           .spawn({ projectId, prompt, title, environment: { type: "host", hostId: source.hostId, workspace: { type: "unmanaged", path: worktree } } })
           .then((thread) => ({ threadId: thread.id }));
-      return { threads: await sendToThreads(await hallRoot(projectId), feature, exec, spawn) };
+      return { threads: await sendToThreads(await hallRoot(projectId), feature, exec, spawn, await resolveBinary("ivar")) };
     },
   });
 }

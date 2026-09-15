@@ -33,25 +33,25 @@ export const addComment = (root: string, feature: string, i: AddCommentInput, ru
 export const resolveComment = (root: string, feature: string, id: string, run: Exec) =>
   ivarJson<ReviewComment>(root, ["review", "comment", "resolve", feature, id], run);
 
-export function buildThreadPrompt(feature: string, repo: string, comments: ReviewComment[]): string {
+export function buildThreadPrompt(feature: string, repo: string, comments: ReviewComment[], ivarBin = "ivar"): string {
   return [
     `Apply these review comments on feature \`${feature}\` in repo \`${repo}\`.`,
     "After addressing each one, run the resolve command shown next to it.",
     "",
     ...comments.map(
-      (c) => `- ${c.file}:${c.line_start}-${c.line_end} — ${c.body}\n  resolve: \`ivar review comment resolve ${feature} ${c.id}\``,
+      (c) => `- ${c.file}:${c.line_start}-${c.line_end} — ${c.body}\n  resolve: \`${ivarBin} review comment resolve ${feature} ${c.id}\``,
     ),
   ].join("\n");
 }
 
-export async function sendToThreads(root: string, feature: string, run: Exec, spawn: SpawnThread) {
+export async function sendToThreads(root: string, feature: string, run: Exec, spawn: SpawnThread, ivarBin = "ivar") {
   const open = (await listComments(root, feature, run)).filter((c) => c.status === "open");
   const status = await ivarJson<{ repos: Array<{ repo: string; worktree: string }> }>(root, ["feature", "status", feature], run);
   const results: Array<{ repo: string; threadId: string }> = [];
   for (const { repo, worktree } of status.repos) {
     const comments = open.filter((c) => c.repo === repo);
     if (comments.length === 0) continue;
-    const { threadId } = await spawn({ repo, worktree, prompt: buildThreadPrompt(feature, repo, comments), title: `Review: ${feature} / ${repo}` });
+    const { threadId } = await spawn({ repo, worktree, prompt: buildThreadPrompt(feature, repo, comments, ivarBin), title: `Review: ${feature} / ${repo}` });
     results.push({ repo, threadId });
   }
   return results;
