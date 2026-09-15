@@ -21,7 +21,7 @@ function IvarPanel({ subPath }: PluginNavPanelProps) {
   const selectProject = (id: string) => navigate.toPluginPanel("ivar", { subPath: encodeURIComponent(id) });
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-auto">
       {!route.feature && projects.length > 1 && (
         <label style={{ display: "block", padding: "16px 16px 0" }}>
           Project{" "}
