@@ -8,6 +8,7 @@ import {
 import { HallView } from "./src/app/hall-view.js";
 import { parsePanelRoute, pickProject } from "./src/app/panel-route.js";
 import { ReviewView } from "./src/app/review-view.js";
+import { CommentsTab } from "./src/app/comments-tab.js";
 
 function IvarPanel({ subPath }: PluginNavPanelProps) {
   const context = useBbContext();
@@ -39,5 +40,12 @@ function IvarPanel({ subPath }: PluginNavPanelProps) {
 }
 
 export default definePluginApp((app) =>
-  app.slots.navPanel({ id: "ivar", title: "ivar", icon: "Network", path: "ivar", component: IvarPanel }),
+  app.slots.navPanel({
+    id: "ivar",
+    title: "ivar",
+    icon: "Network",
+    path: "ivar",
+    component: IvarPanel,
+    fixedTabs: [{ panelId: "ivar", id: "comments", title: "Review comments", icon: "MessageSquare", component: CommentsTab }],
+  }),
 );
