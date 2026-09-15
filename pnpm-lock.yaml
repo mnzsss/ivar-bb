@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@get-bb/plugin-sdk':
-        specifier: ^0.4.88
-        version: 0.4.88(@types/react@19.3.0)(react@19.3.0)(zod@4.6.5)
+        specifier: 0.4.87
+        version: 0.4.87(@types/react@19.3.0)(react@19.3.0)(zod@4.6.5)
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -192,8 +192,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@get-bb/plugin-sdk@0.4.88':
-    resolution: {integrity: sha512-y4L9VfwOtgc6jFd9AjfPzKpRy+BQLiVC/w5tGDlxws+Gkd+ytHtc7Klct/olKoSYSlq9LOjs4tryySp70GiiMw==}
+  '@get-bb/plugin-sdk@0.4.87':
+    resolution: {integrity: sha512-mTlcPPpef2fA7eWEiP7VutYXP1grn3efKzGDYaSTBXelkrwatUdlPXyZodehJyEJhRYGa8rUXo/WxNIecP9Nvg==}
     peerDependencies:
       '@testing-library/react': ^16.3.2
       '@types/better-sqlite3': ^7.6.12
@@ -918,7 +918,7 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
-  '@get-bb/plugin-sdk@0.4.88(@types/react@19.3.0)(react@19.3.0)(zod@4.6.5)':
+  '@get-bb/plugin-sdk@0.4.87(@types/react@19.3.0)(react@19.3.0)(zod@4.6.5)':
     optionalDependencies:
       '@types/react': 19.3.0
       react: 19.3.0

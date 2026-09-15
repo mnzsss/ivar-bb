@@ -4,7 +4,7 @@
   "type": "module",
   "engines": {
     "bb": ">=0.0",
-    "bbPluginSdk": ">=0.4.88"
+    "bbPluginSdk": ">=0.4.87"
   },
   "bb": {
     "name": "ivar",
@@ -23,7 +23,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@get-bb/plugin-sdk": "^0.4.88",
+    "@get-bb/plugin-sdk": "0.4.87",
     "zod": "^4.6.5"
   },
   "devDependencies": {
