@@ -6,8 +6,14 @@ const bbStyledScreens = [
   "src/app/file-diff.tsx",
   "app.tsx",
   "src/app/hall-view.tsx",
+  "src/app/comments-tab.tsx",
 ];
-const noInlineStyleScreens = ["src/app/review-view.tsx", "app.tsx", "src/app/hall-view.tsx"];
+const noInlineStyleScreens = [
+  "src/app/review-view.tsx",
+  "app.tsx",
+  "src/app/hall-view.tsx",
+  "src/app/comments-tab.tsx",
+];
 
 describe("plugin screens follow bb's design system", () => {
   it.each(bbStyledScreens)("%s renders bb components instead of native controls", (file) => {
