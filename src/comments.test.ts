@@ -24,11 +24,19 @@ describe("buildThreadPrompt", () => {
     const prompt = buildThreadPrompt("checkout", "api", [open("c1", "api")]);
     expect(prompt).toContain("src/a.ts:3-5");
     expect(prompt).toContain("fix c1");
-    expect(prompt).toContain("ivar review comment resolve checkout c1");
+    expect(prompt).toContain("'ivar' review comment resolve -- checkout c1");
   });
   it("uses the given ivar binary path in resolve commands", () => {
     const prompt = buildThreadPrompt("checkout", "api", [open("c1", "api")], "/abs/path/ivar");
-    expect(prompt).toContain("`/abs/path/ivar review comment resolve checkout c1`");
+    expect(prompt).toContain("`'/abs/path/ivar' review comment resolve -- checkout c1`");
+  });
+  it("single-quotes a binary path containing a space", () => {
+    const prompt = buildThreadPrompt("checkout", "api", [open("c1", "api")], "/abs/path with space/ivar");
+    expect(prompt).toContain("`'/abs/path with space/ivar' review comment resolve -- checkout c1`");
+  });
+  it("escapes an embedded single quote in the binary path", () => {
+    const prompt = buildThreadPrompt("checkout", "api", [open("c1", "api")], "/abs/o'brien/ivar");
+    expect(prompt).toContain(`'/abs/o'\\''brien/ivar'`);
   });
 });
 

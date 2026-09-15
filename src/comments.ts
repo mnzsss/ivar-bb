@@ -19,13 +19,18 @@ export const addComment = (root: string, feature: string, i: AddCommentInput, ru
 export const resolveComment = (root: string, feature: string, id: string, run: Exec) =>
   ivarJson(root, ["review", "comment", "resolve", "--", feature, id], run, reviewComment);
 
+function shellQuote(value: string): string {
+  return `'${value.replace(/'/g, `'\\''`)}'`;
+}
+
 export function buildThreadPrompt(feature: string, repo: string, comments: ReviewComment[], ivarBin = "ivar"): string {
+  const bin = shellQuote(ivarBin);
   return [
     `Apply these review comments on feature \`${feature}\` in repo \`${repo}\`.`,
     "After addressing each one, run the resolve command shown next to it.",
     "",
     ...comments.map(
-      (c) => `- ${c.file}:${c.line_start}-${c.line_end} — ${c.body}\n  resolve: \`${ivarBin} review comment resolve ${feature} ${c.id}\``,
+      (c) => `- ${c.file}:${c.line_start}-${c.line_end} — ${c.body}\n  resolve: \`${bin} review comment resolve -- ${feature} ${c.id}\``,
     ),
   ].join("\n");
 }
