@@ -1,0 +1,44 @@
+{
+  "name": "bb-plugin-ivar",
+  "version": "0.1.0",
+  "keywords": [
+    "bb-plugin"
+  ],
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint --deny-warnings",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "build": "npx -y -p bb-app@0.43.1 bb plugin build"
+  },
+  "dependencies": {
+    "@get-bb/plugin-sdk": "0.4.87",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@pierre/diffs": "1.4.2",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.3.0",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "react": "^19.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "engines": {
+    "bb": ">=0.0",
+    "bbPluginSdk": ">=0.4.87"
+  },
+  "packageManager": "pnpm@10.33.4",
+  "bb": {
+    "name": "ivar",
+    "description": "Manage an ivar hall and review features locally.",
+    "branding": {
+      "icon": "Network"
+    },
+    "server": "./src/server.ts",
+    "app": "./app.tsx"
+  }
+}
