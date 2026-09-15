@@ -17,8 +17,14 @@ function IvarPanel({ subPath }: PluginNavPanelProps) {
   const route = parsePanelRoute(subPath);
   const projectId = pickProject(projects, route.projectId ?? context.projectId);
 
-  if (!projectId) return <div style={{ padding: 16 }}>{status === "loading" ? "Loading…" : "No project available for an ivar hall."}</div>;
-  const selectProject = (id: string) => navigate.toPluginPanel("ivar", { subPath: encodeURIComponent(id) });
+  if (!projectId)
+    return (
+      <div style={{ padding: 16 }}>
+        {status === "loading" ? "Loading…" : "No project available for an ivar hall."}
+      </div>
+    );
+  const selectProject = (id: string) =>
+    navigate.toPluginPanel("ivar", { subPath: encodeURIComponent(id) });
 
   return (
     <div className="min-h-0 flex-1 overflow-auto">
@@ -26,7 +32,11 @@ function IvarPanel({ subPath }: PluginNavPanelProps) {
         <label style={{ display: "block", padding: "16px 16px 0" }}>
           Project{" "}
           <select value={projectId} onChange={(e) => selectProject(e.target.value)}>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
           </select>
         </label>
       )}
@@ -46,6 +56,14 @@ export default definePluginApp((app) =>
     icon: "Network",
     path: "ivar",
     component: IvarPanel,
-    fixedTabs: [{ panelId: "ivar", id: "comments", title: "Review comments", icon: "MessageSquare", component: CommentsTab }],
+    fixedTabs: [
+      {
+        panelId: "ivar",
+        id: "comments",
+        title: "Review comments",
+        icon: "MessageSquare",
+        component: CommentsTab,
+      },
+    ],
   }),
 );

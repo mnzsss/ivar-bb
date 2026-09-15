@@ -1,5 +1,11 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { addComment, listComments, resolveComment, sendToThreads, type SpawnThread } from "./comments.js";
+import {
+  addComment,
+  listComments,
+  resolveComment,
+  sendToThreads,
+  type SpawnThread,
+} from "./comments.js";
 import { featureDiff } from "./diff.js";
 import { exec, fsExists, resolveBinary, type Exec } from "./exec.js";
 import { findHallRoot, getHall, runIvar } from "./hall.js";
@@ -22,19 +28,37 @@ export default async function plugin(bb: BbPluginApi): Promise<void> {
   };
 
   bb.rpc.register(ivarRpcContract, {
-    "hall.get": async ({ projectId }) => getHall((await projectSource(projectId)).path, run, fsExists),
-    "hall.run": async ({ projectId, ...command }) => runIvar(await hallRoot(projectId), command, run),
-    "feature.diff": async ({ projectId, feature }) => featureDiff(await hallRoot(projectId), feature, run),
-    "comments.list": async ({ projectId, feature }) => ({ comments: await listComments(await hallRoot(projectId), feature, run) }),
-    "comments.add": async ({ projectId, feature, ...input }) => addComment(await hallRoot(projectId), feature, input, run),
-    "comments.resolve": async ({ projectId, feature, id }) => resolveComment(await hallRoot(projectId), feature, id, run),
+    "hall.get": async ({ projectId }) =>
+      getHall((await projectSource(projectId)).path, run, fsExists),
+    "hall.run": async ({ projectId, ...command }) =>
+      runIvar(await hallRoot(projectId), command, run),
+    "feature.diff": async ({ projectId, feature }) =>
+      featureDiff(await hallRoot(projectId), feature, run),
+    "comments.list": async ({ projectId, feature }) => ({
+      comments: await listComments(await hallRoot(projectId), feature, run),
+    }),
+    "comments.add": async ({ projectId, feature, ...input }) =>
+      addComment(await hallRoot(projectId), feature, input, run),
+    "comments.resolve": async ({ projectId, feature, id }) =>
+      resolveComment(await hallRoot(projectId), feature, id, run),
     "comments.send": async ({ projectId, feature }) => {
       const source = await projectSource(projectId);
       const spawn: SpawnThread = ({ worktree, prompt, title }) =>
         bb.sdk.threads
-          .spawn({ projectId, prompt, title, environment: { type: "host", hostId: source.hostId, workspace: { type: "unmanaged", path: worktree } } })
+          .spawn({
+            projectId,
+            prompt,
+            title,
+            environment: {
+              type: "host",
+              hostId: source.hostId,
+              workspace: { type: "unmanaged", path: worktree },
+            },
+          })
           .then((thread) => ({ threadId: thread.id }));
-      return { threads: await sendToThreads(await hallRoot(projectId), feature, run, spawn, ivarBin) };
+      return {
+        threads: await sendToThreads(await hallRoot(projectId), feature, run, spawn, ivarBin),
+      };
     },
   });
 }

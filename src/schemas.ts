@@ -24,7 +24,9 @@ export const repoStatus = z.object({
 export const featureStatus = z.object({ repos: z.array(repoStatus) });
 
 export const repoList = z.object({ repos: z.array(z.object({ name: z.string() })) });
-export const featureList = z.object({ features: z.array(z.object({ name: z.string(), repos: z.array(z.string()) })) });
+export const featureList = z.object({
+  features: z.array(z.object({ name: z.string(), repos: z.array(z.string()) })),
+});
 
 export const hallView = z.discriminatedUnion("status", [
   z.object({
@@ -44,4 +46,7 @@ export type FileDiffEntry = z.infer<typeof fileDiffEntry>;
 export const repoDiffError = z.object({ repo: z.string(), message: z.string() });
 export type RepoDiffError = z.infer<typeof repoDiffError>;
 
-export const featureDiffResult = z.object({ files: z.array(fileDiffEntry), errors: z.array(repoDiffError) });
+export const featureDiffResult = z.object({
+  files: z.array(fileDiffEntry),
+  errors: z.array(repoDiffError),
+});

@@ -8,8 +8,20 @@ export type HallSummary = {
 };
 
 export function hallSummary(hall: HallView): HallSummary {
-  if (hall.status === "no-hall") return { title: "ivar", empty: "No ivar.json found above this project.", repos: [], features: [] };
-  if (hall.status === "ivar-missing") return { title: "ivar", empty: "The ivar binary is not on the bb server PATH.", repos: [], features: [] };
+  if (hall.status === "no-hall")
+    return {
+      title: "ivar",
+      empty: "No ivar.json found above this project.",
+      repos: [],
+      features: [],
+    };
+  if (hall.status === "ivar-missing")
+    return {
+      title: "ivar",
+      empty: "The ivar binary is not on the bb server PATH.",
+      repos: [],
+      features: [],
+    };
   return {
     title: hall.root,
     repos: hall.repos,

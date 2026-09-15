@@ -18,19 +18,36 @@ function exitCode(err: ExecFileException): number {
   return typeof err.code === "number" ? err.code : 1;
 }
 
-export function checkedStdout(result: ExecResult, cmd: string, args: string[], okCodes = [0]): string {
+export function checkedStdout(
+  result: ExecResult,
+  cmd: string,
+  args: string[],
+  okCodes = [0],
+): string {
   if (okCodes.includes(result.code)) return result.stdout;
   const detail = result.stderr.trim() || result.stdout.trim();
   throw new Error(`${cmd} ${args.join(" ")} exited ${result.code}${detail ? `: ${detail}` : ""}`);
 }
 
-export async function checked(run: Exec, cmd: string, args: string[], cwd: string, okCodes = [0]): Promise<string> {
+export async function checked(
+  run: Exec,
+  cmd: string,
+  args: string[],
+  cwd: string,
+  okCodes = [0],
+): Promise<string> {
   return checkedStdout(await run(cmd, args, cwd), cmd, args, okCodes);
 }
 
-export const parseIvarJson = <T>(stdout: string, schema: z.ZodType<T>): T => schema.parse(JSON.parse(stdout));
+export const parseIvarJson = <T>(stdout: string, schema: z.ZodType<T>): T =>
+  schema.parse(JSON.parse(stdout));
 
-export async function ivarJson<T>(root: string, args: string[], run: Exec, schema: z.ZodType<T>): Promise<T> {
+export async function ivarJson<T>(
+  root: string,
+  args: string[],
+  run: Exec,
+  schema: z.ZodType<T>,
+): Promise<T> {
   return parseIvarJson(await checked(run, "ivar", ["--json", ...args], root), schema);
 }
 

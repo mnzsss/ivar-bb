@@ -9,22 +9,36 @@ export type HallCommand =
   | { command: "feature create"; name: string }
   | { command: "promote"; feature: string; repo: string };
 
-export async function findHallRoot(start: string, exists: (p: string) => Promise<boolean>): Promise<string | null> {
+export async function findHallRoot(
+  start: string,
+  exists: (p: string) => Promise<boolean>,
+): Promise<string | null> {
   for (let dir = start; ; dir = path.dirname(dir)) {
     if (await exists(path.join(dir, "ivar.json"))) return dir;
     if (path.dirname(dir) === dir) return null;
   }
 }
 
-export async function getHall(start: string, run: Exec, exists: (p: string) => Promise<boolean>): Promise<HallView> {
+export async function getHall(
+  start: string,
+  run: Exec,
+  exists: (p: string) => Promise<boolean>,
+): Promise<HallView> {
   const root = await findHallRoot(start, exists);
   if (!root) return { status: "no-hall" };
   const repoArgs = ["--json", "repo", "list"];
   const repoResult = await run("ivar", repoArgs, root);
   if (repoResult.code === 127) return { status: "ivar-missing" };
-  const repos = parseIvarJson(checkedStdout(repoResult, "ivar", repoArgs), repoList).repos.map((r) => r.name);
+  const repos = parseIvarJson(checkedStdout(repoResult, "ivar", repoArgs), repoList).repos.map(
+    (r) => r.name,
+  );
   const { features } = await ivarJson(root, ["feature", "list"], run, featureList);
-  return { status: "ok", root, repos, features: features.map((f) => ({ name: f.name, promoted: f.repos })) };
+  return {
+    status: "ok",
+    root,
+    repos,
+    features: features.map((f) => ({ name: f.name, promoted: f.repos })),
+  };
 }
 
 function positional(value: string): string {
@@ -44,4 +58,5 @@ export function hallCommandArgs(input: HallCommand): string[] {
   }
 }
 
-export const runIvar = (root: string, input: HallCommand, run: Exec) => run("ivar", hallCommandArgs(input), root);
+export const runIvar = (root: string, input: HallCommand, run: Exec) =>
+  run("ivar", hallCommandArgs(input), root);

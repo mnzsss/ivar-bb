@@ -7,7 +7,7 @@ export type CommentRange = { kind: "range"; start: number; end: number; side: "a
 export function groupByRepo(files: FileDiffEntry[]) {
   const groups = new Map<string, FileDiffEntry[]>();
   for (const f of files) groups.set(f.repo, [...(groups.get(f.repo) ?? []), f]);
-  return [...groups].map(([repo, files]) => ({ repo, files }));
+  return [...groups].map(([repo, repoFiles]) => ({ repo, files: repoFiles }));
 }
 
 export const toAnnotations = (file: FileDiffEntry, comments: ReviewComment[]) =>
@@ -15,10 +15,18 @@ export const toAnnotations = (file: FileDiffEntry, comments: ReviewComment[]) =>
     .filter((c) => c.repo === file.repo && c.file === file.path)
     .map((c) => ({ side: "additions" as const, lineNumber: c.line_end, metadata: c }));
 
-export function toCommentRange(selection: SelectedLineRange | null): CommentRange | { kind: "rejected" } | null {
+export function toCommentRange(
+  selection: SelectedLineRange | null,
+): CommentRange | { kind: "rejected" } | null {
   if (!selection) return null;
-  if (selection.side === "deletions" || (selection.endSide ?? selection.side) === "deletions") return { kind: "rejected" };
-  return { kind: "range", start: Math.min(selection.start, selection.end), end: Math.max(selection.start, selection.end), side: "additions" };
+  if (selection.side === "deletions" || (selection.endSide ?? selection.side) === "deletions")
+    return { kind: "rejected" };
+  return {
+    kind: "range",
+    start: Math.min(selection.start, selection.end),
+    end: Math.max(selection.start, selection.end),
+    side: "additions",
+  };
 }
 
 export function errorMessage(e: unknown): string {

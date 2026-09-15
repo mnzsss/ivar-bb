@@ -5,7 +5,9 @@ export function skipWhileInFlight(fn: () => Promise<unknown>): () => void {
   return () => {
     if (inFlight) return;
     inFlight = true;
-    void fn().finally(() => { inFlight = false; });
+    void fn().finally(() => {
+      inFlight = false;
+    });
   };
 }
 

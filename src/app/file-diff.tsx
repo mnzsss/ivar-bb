@@ -6,15 +6,31 @@ import type { ReviewComment } from "../schemas.js";
 import { countChanges, toAnnotations, toCommentRange, type CommentRange } from "./review-model.js";
 import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
 
-function CommentCard({ comment, onResolve }: { comment: ReviewComment; onResolve(id: string): void }) {
+function CommentCard({
+  comment,
+  onResolve,
+}: {
+  comment: ReviewComment;
+  onResolve(id: string): void;
+}) {
   const resolved = comment.status === "resolved";
   return (
-    <div className={`m-2 flex items-start gap-2 rounded-md border border-[var(--border)] bg-[var(--card)] p-2 text-xs ${resolved ? "opacity-60" : ""}`}>
+    <div
+      className={`m-2 flex items-start gap-2 rounded-md border border-[var(--border)] bg-[var(--card)] p-2 text-xs ${resolved ? "opacity-60" : ""}`}
+    >
       <p className="m-0 min-w-0 flex-1 whitespace-pre-wrap">
-        {resolved && <span className={`${mutedTextClass} mr-2`}>Resolved · L{comment.line_start}–{comment.line_end}</span>}
+        {resolved && (
+          <span className={`${mutedTextClass} mr-2`}>
+            Resolved · L{comment.line_start}–{comment.line_end}
+          </span>
+        )}
         {comment.body}
       </p>
-      {!resolved && <button className={buttonClass} onClick={() => onResolve(comment.id)}>Resolve</button>}
+      {!resolved && (
+        <button className={buttonClass} onClick={() => onResolve(comment.id)}>
+          Resolve
+        </button>
+      )}
     </div>
   );
 }
@@ -37,14 +53,28 @@ function CommentForm({ onSubmit, onCancel }: { onSubmit(body: string): void; onC
         className="w-full rounded-md border border-[var(--input)] bg-[var(--background)] p-2 text-xs text-[var(--foreground)]"
       />
       <div className="flex gap-2">
-        <button type="submit" className={primaryButtonClass}>Comment</button>
-        <button type="button" className={buttonClass} onClick={onCancel}>Cancel</button>
+        <button type="submit" className={primaryButtonClass}>
+          Comment
+        </button>
+        <button type="button" className={buttonClass} onClick={onCancel}>
+          Cancel
+        </button>
       </div>
     </form>
   );
 }
 
-export function IvarFileDiff({ file, view, comments, collapsed, rejected, onToggle, onSelection, onAdd, onResolve }: {
+export function IvarFileDiff({
+  file,
+  view,
+  comments,
+  collapsed,
+  rejected,
+  onToggle,
+  onSelection,
+  onAdd,
+  onResolve,
+}: {
   file: FileDiffEntry;
   view: "unified" | "split";
   comments: ReviewComment[];
@@ -56,7 +86,10 @@ export function IvarFileDiff({ file, view, comments, collapsed, rejected, onTogg
   onResolve(id: string): void;
 }) {
   const [range, setRange] = useState<CommentRange | null>(null);
-  const fileDiff = useMemo(() => parsePatchFiles(file.patch, undefined, false)[0]?.files[0], [file.patch]);
+  const fileDiff = useMemo(
+    () => parsePatchFiles(file.patch, undefined, false)[0]?.files[0],
+    [file.patch],
+  );
   const changes = useMemo(() => countChanges(file.patch), [file.patch]);
 
   return (
@@ -72,7 +105,11 @@ export function IvarFileDiff({ file, view, comments, collapsed, rejected, onTogg
           <span className="text-[var(--diff-added)]">+{changes.additions}</span>
           <span className="text-[var(--diff-removed)]">−{changes.deletions}</span>
         </button>
-        {rejected && <span role="status" className="text-[var(--warning-text)]">Comment on added or unchanged lines only</span>}
+        {rejected && (
+          <span role="status" className="text-[var(--warning-text)]">
+            Comment on added or unchanged lines only
+          </span>
+        )}
         <span className={mutedTextClass}>{file.repo}</span>
       </div>
       {collapsed ? null : !fileDiff ? (
@@ -99,7 +136,13 @@ export function IvarFileDiff({ file, view, comments, collapsed, rejected, onTogg
             a.metadata ? (
               <CommentCard comment={a.metadata} onResolve={onResolve} />
             ) : range ? (
-              <CommentForm onSubmit={(body) => { onAdd(range, body); setRange(null); }} onCancel={() => setRange(null)} />
+              <CommentForm
+                onSubmit={(body) => {
+                  onAdd(range, body);
+                  setRange(null);
+                }}
+                onCancel={() => setRange(null)}
+              />
             ) : null
           }
         />

@@ -16,7 +16,10 @@ export function CommentsTab({ subPath }: PluginNavPanelProps) {
   const load = useCallback(async () => {
     if (!projectId || !route.feature) return;
     await rpc.call("comments.list", { projectId, feature: route.feature }).then(
-      (r) => { setComments(r.comments); setError(null); },
+      (r) => {
+        setComments(r.comments);
+        setError(null);
+      },
       (e: Error) => setError(e.message),
     );
   }, [rpc, projectId, route.feature]);
@@ -33,7 +36,9 @@ export function CommentsTab({ subPath }: PluginNavPanelProps) {
         <ul style={{ margin: 0, paddingLeft: 16 }}>
           {open.map((c) => (
             <li key={c.id} style={{ marginBottom: 8 }}>
-              <code>{c.repo}:{c.file}:{c.line_start}-{c.line_end}</code>
+              <code>
+                {c.repo}:{c.file}:{c.line_start}-{c.line_end}
+              </code>
               <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{c.body}</p>
             </li>
           ))}

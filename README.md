@@ -30,6 +30,7 @@ A [bb](https://github.com/get-bb/bb) plugin to manage an [ivar](https://github.c
 
   The bb server and the threads it spawns run the first `ivar` on their `PATH`, so make sure
   that is this build (`ivar review comment --help` should work).
+
 - **git** on `PATH`.
 
 ## Installation

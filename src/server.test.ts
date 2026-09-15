@@ -4,10 +4,15 @@ import { ivarRpcContract } from "./rpc";
 
 describe("plugin", () => {
   it("registers the ivar rpc contract", async () => {
-    const register = vi.fn();
+    const register = vi.fn<(contract: unknown, handlers: Record<string, unknown>) => void>();
     await plugin({ rpc: { register } } as never);
-    expect(register).toHaveBeenCalledWith(ivarRpcContract, expect.objectContaining({ "hall.get": expect.any(Function) }));
-    expect(Object.keys(register.mock.calls[0]![1]).sort()).toEqual(Object.keys(ivarRpcContract).sort());
+    expect(register).toHaveBeenCalledWith(
+      ivarRpcContract,
+      expect.objectContaining({ "hall.get": expect.any(Function) }),
+    );
+    expect(Object.keys(register.mock.calls[0]![1]).toSorted()).toEqual(
+      Object.keys(ivarRpcContract).toSorted(),
+    );
   });
 });
 
@@ -24,7 +29,9 @@ describe("rpc contract", () => {
   });
   it("accepts only typed hall commands", () => {
     const run = ivarRpcContract["hall.run"].input;
-    expect(run.safeParse({ projectId: "p", command: "promote", feature: "f", repo: "r" }).success).toBe(true);
+    expect(
+      run.safeParse({ projectId: "p", command: "promote", feature: "f", repo: "r" }).success,
+    ).toBe(true);
     expect(run.safeParse({ projectId: "p", command: "promote", feature: "f" }).success).toBe(false);
     expect(run.safeParse({ projectId: "p", command: "deliver" }).success).toBe(false);
   });

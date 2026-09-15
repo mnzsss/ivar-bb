@@ -16,7 +16,14 @@ export function HallView({ projectId }: { projectId: string }) {
   const [newFeature, setNewFeature] = useState("");
 
   const refresh = useCallback(
-    () => rpc.call("hall.get", { projectId }).then((h) => { setHall(h); setError(null); }, (e: Error) => setError(e.message)),
+    () =>
+      rpc.call("hall.get", { projectId }).then(
+        (h) => {
+          setHall(h);
+          setError(null);
+        },
+        (e: Error) => setError(e.message),
+      ),
     [rpc, projectId],
   );
 
@@ -47,22 +54,38 @@ export function HallView({ projectId }: { projectId: string }) {
         <>
           <section>
             <h3>Repos</h3>
-            <ul>{summary.repos.map((repo) => <li key={repo}>{repo}</li>)}</ul>
+            <ul>
+              {summary.repos.map((repo) => (
+                <li key={repo}>{repo}</li>
+              ))}
+            </ul>
           </section>
           <section>
             <h3>Features</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (newFeature.trim()) void run({ command: "feature create", name: newFeature.trim() }).then(() => setNewFeature(""));
+                if (newFeature.trim())
+                  void run({ command: "feature create", name: newFeature.trim() }).then(() =>
+                    setNewFeature(""),
+                  );
               }}
             >
-              <input value={newFeature} onChange={(e) => setNewFeature(e.target.value)} placeholder="New feature" />
+              <input
+                value={newFeature}
+                onChange={(e) => setNewFeature(e.target.value)}
+                placeholder="New feature"
+              />
               <button type="submit">Create</button>
             </form>
             <table style={{ borderSpacing: "12px 4px" }}>
               <thead>
-                <tr><th>Name</th><th>Promoted</th><th>Promote</th><th /></tr>
+                <tr>
+                  <th>Name</th>
+                  <th>Promoted</th>
+                  <th>Promote</th>
+                  <th />
+                </tr>
               </thead>
               <tbody>
                 {summary.features.map((feature) => (
@@ -71,19 +94,45 @@ export function HallView({ projectId }: { projectId: string }) {
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {feature.promoted.map((repo) => (
-                          <span key={repo} style={{ padding: "0 6px", border: "1px solid currentColor", borderRadius: 10 }}>{repo}</span>
+                          <span
+                            key={repo}
+                            style={{
+                              padding: "0 6px",
+                              border: "1px solid currentColor",
+                              borderRadius: 10,
+                            }}
+                          >
+                            {repo}
+                          </span>
                         ))}
                       </div>
                     </td>
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                        {summary.repos.filter((repo) => !feature.promoted.includes(repo)).map((repo) => (
-                          <button key={repo} onClick={() => run({ command: "promote", feature: feature.name, repo })}>{repo}</button>
-                        ))}
+                        {summary.repos
+                          .filter((repo) => !feature.promoted.includes(repo))
+                          .map((repo) => (
+                            <button
+                              key={repo}
+                              onClick={() =>
+                                run({ command: "promote", feature: feature.name, repo })
+                              }
+                            >
+                              {repo}
+                            </button>
+                          ))}
                       </div>
                     </td>
                     <td>
-                      <button onClick={() => navigate.toPluginPanel("ivar", { subPath: `${encodeURIComponent(projectId)}/${feature.href}` })}>Review</button>
+                      <button
+                        onClick={() =>
+                          navigate.toPluginPanel("ivar", {
+                            subPath: `${encodeURIComponent(projectId)}/${feature.href}`,
+                          })
+                        }
+                      >
+                        Review
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -92,9 +141,7 @@ export function HallView({ projectId }: { projectId: string }) {
           </section>
         </>
       )}
-      {lastRun && (
-        <pre>{`exit ${lastRun.code}\n${lastRun.stdout}${lastRun.stderr}`}</pre>
-      )}
+      {lastRun && <pre>{`exit ${lastRun.code}\n${lastRun.stdout}${lastRun.stderr}`}</pre>}
     </div>
   );
 }
