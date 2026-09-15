@@ -4,11 +4,16 @@ import type { ivarRpcContract } from "../rpc.js";
 import type { FileDiffEntry, RepoDiffError } from "../diff.js";
 import type { ReviewComment } from "../schemas.js";
 import { IvarFileDiff } from "./file-diff.js";
-import { errorMessage, groupByRepo, toggleKey } from "./review-model.js";
+import {
+  errorMessage,
+  fileKey,
+  groupByRepo,
+  reuseIfEqual,
+  reuseUnchangedFiles,
+  toggleKey,
+} from "./review-model.js";
 import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
 import { usePolling } from "./use-polling.js";
-
-const keyOf = (file: FileDiffEntry) => `${file.repo}/${file.path}`;
 
 export function ReviewView({ projectId, feature }: { projectId: string; feature: string }) {
   const rpc = useRpc<typeof ivarRpcContract>();
@@ -29,8 +34,8 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
     () =>
       rpc.call("feature.diff", { projectId, feature }).then(
         (r) => {
-          setFiles(r.files);
-          setRepoErrors(r.errors);
+          setFiles((previous) => reuseUnchangedFiles(previous, r.files));
+          setRepoErrors((previous) => reuseIfEqual(previous, r.errors));
           setDiffError(null);
         },
         (e: unknown) => setDiffError(errorMessage(e)),
@@ -41,7 +46,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
     () =>
       rpc.call("comments.list", { projectId, feature }).then(
         (r) => {
-          setComments(r.comments);
+          setComments((previous) => reuseIfEqual(previous, r.comments));
           setCommentsError(null);
         },
         (e: unknown) => setCommentsError(errorMessage(e)),
@@ -75,7 +80,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   const openCount = comments.filter((c) => c.status === "open").length;
   const resolvedCount = comments.length - openCount;
   const visibleComments = showResolved ? comments : comments.filter((c) => c.status === "open");
-  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(keyOf(f)));
+  const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(fileKey(f)));
 
   return (
     <div className="flex flex-col text-sm text-[var(--foreground)]">
@@ -104,7 +109,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
         <button
           className={buttonClass}
           disabled={files.length === 0}
-          onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(files.map(keyOf)))}
+          onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(files.map(fileKey)))}
         >
           {allCollapsed ? "Expand all" : "Collapse all"}
         </button>
@@ -164,10 +169,10 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
                 file={file}
                 view={view}
                 comments={visibleComments}
-                collapsed={collapsed.has(keyOf(file))}
-                rejected={rejectedKey === keyOf(file)}
-                onToggle={() => setCollapsed((keys) => toggleKey(keys, keyOf(file)))}
-                onSelection={(rejected) => setRejectedKey(rejected ? keyOf(file) : null)}
+                collapsed={collapsed.has(fileKey(file))}
+                rejected={rejectedKey === fileKey(file)}
+                onToggle={() => setCollapsed((keys) => toggleKey(keys, fileKey(file)))}
+                onSelection={(rejected) => setRejectedKey(rejected ? fileKey(file) : null)}
                 onAdd={(range, body) => void addComment(file, range, body)}
                 onResolve={(id) => void resolve(id)}
               />

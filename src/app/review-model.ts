@@ -4,6 +4,22 @@ import type { ReviewComment } from "../schemas.js";
 
 export type CommentRange = { kind: "range"; start: number; end: number; side: "additions" };
 
+export const fileKey = (file: { repo: string; path: string }) => `${file.repo}/${file.path}`;
+
+export function reuseUnchangedFiles(previous: FileDiffEntry[], next: FileDiffEntry[]) {
+  const byKey = new Map(previous.map((f) => [fileKey(f), f]));
+  const merged = next.map((f) => {
+    const old = byKey.get(fileKey(f));
+    return old && old.patch === f.patch ? old : f;
+  });
+  return merged.length === previous.length && merged.every((f, i) => f === previous[i])
+    ? previous
+    : merged;
+}
+
+export const reuseIfEqual = <T>(previous: T, next: T): T =>
+  JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
+
 export function groupByRepo(files: FileDiffEntry[]) {
   const groups = new Map<string, FileDiffEntry[]>();
   for (const f of files) groups.set(f.repo, [...(groups.get(f.repo) ?? []), f]);

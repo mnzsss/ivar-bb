@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   countChanges,
   errorMessage,
+  fileKey,
   groupByRepo,
+  reuseIfEqual,
+  reuseUnchangedFiles,
   toAnnotations,
   toCommentRange,
   toggleKey,
@@ -92,5 +95,42 @@ describe("countChanges", () => {
     const patch =
       "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n ctx\n-old\n+new\n+more\n";
     expect(countChanges(patch)).toEqual({ additions: 2, deletions: 1 });
+  });
+});
+
+describe("fileKey", () => {
+  it("joins repo and path", () => expect(fileKey(file("api", "src/a.ts"))).toBe("api/src/a.ts"));
+});
+
+describe("reuseUnchangedFiles", () => {
+  const entry = (path: string, patch: string) => ({ repo: "api", path, patch });
+  it("returns the previous array when every patch is unchanged", () => {
+    const previous = [entry("a", "p1"), entry("b", "p2")];
+    expect(reuseUnchangedFiles(previous, [entry("a", "p1"), entry("b", "p2")])).toBe(previous);
+  });
+  it("keeps unchanged entries by identity and takes changed or new ones in the latest order", () => {
+    const a = entry("a", "p1");
+    const changedB = entry("b", "p2-edited");
+    const newC = { repo: "web", path: "c", patch: "p3" };
+    const next = reuseUnchangedFiles([a, entry("b", "p2")], [newC, entry("a", "p1"), changedB]);
+    expect(next).toHaveLength(3);
+    expect(next[0]).toBe(newC);
+    expect(next[1]).toBe(a);
+    expect(next[2]).toBe(changedB);
+  });
+  it("drops files that are gone", () => {
+    const a = entry("a", "p1");
+    const next = reuseUnchangedFiles([a, entry("b", "p2")], [entry("a", "p1")]);
+    expect(next).toHaveLength(1);
+    expect(next[0]).toBe(a);
+  });
+});
+
+describe("reuseIfEqual", () => {
+  it("keeps the previous value only when the next one has the same content", () => {
+    const previous = [comment("1", "api", "a", 3)];
+    expect(reuseIfEqual(previous, [comment("1", "api", "a", 3)])).toBe(previous);
+    const resolved = [comment("1", "api", "a", 3, "resolved")];
+    expect(reuseIfEqual(previous, resolved)).toBe(resolved);
   });
 });
