@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { ivarRpcContract } from "../rpc.js";
-import type { AllowedCommand, HallView as HallData } from "../hall.js";
+import type { HallCommand, HallView as HallData } from "../hall.js";
 import { hallSummary } from "./hall-model.js";
+import { usePolling } from "./use-polling.js";
 
 type RunResult = { code: number; stdout: string; stderr: string };
 
@@ -15,19 +16,15 @@ export function HallView({ projectId }: { projectId: string }) {
   const [newFeature, setNewFeature] = useState("");
 
   const refresh = useCallback(
-    () => rpc.call("hall.get", { projectId }).then(setHall, (e: Error) => setError(e.message)),
+    () => rpc.call("hall.get", { projectId }).then((h) => { setHall(h); setError(null); }, (e: Error) => setError(e.message)),
     [rpc, projectId],
   );
 
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+  usePolling(refresh, 2000);
 
-  const run = async (command: AllowedCommand, args: string[]) => {
+  const run = async (command: HallCommand) => {
     try {
-      setLastRun(await rpc.call("hall.run", { projectId, command, args }));
+      setLastRun(await rpc.call("hall.run", { projectId, ...command }));
     } catch (e) {
       setError((e as Error).message);
     }
@@ -41,7 +38,7 @@ export function HallView({ projectId }: { projectId: string }) {
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
       <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ margin: 0 }}>{summary.title}</h2>
-        {!summary.empty && <button onClick={() => run("sync", [])}>sync</button>}
+        {!summary.empty && <button onClick={() => run({ command: "sync" })}>sync</button>}
       </header>
       {error && <p role="alert">{error}</p>}
       {summary.empty ? (
@@ -57,7 +54,7 @@ export function HallView({ projectId }: { projectId: string }) {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (newFeature.trim()) void run("feature create", [newFeature.trim()]).then(() => setNewFeature(""));
+                if (newFeature.trim()) void run({ command: "feature create", name: newFeature.trim() }).then(() => setNewFeature(""));
               }}
             >
               <input value={newFeature} onChange={(e) => setNewFeature(e.target.value)} placeholder="New feature" />
@@ -81,7 +78,7 @@ export function HallView({ projectId }: { projectId: string }) {
                     <td>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
                         {summary.repos.filter((repo) => !feature.promoted.includes(repo)).map((repo) => (
-                          <button key={repo} onClick={() => run("promote", [feature.name, repo])}>{repo}</button>
+                          <button key={repo} onClick={() => run({ command: "promote", feature: feature.name, repo })}>{repo}</button>
                         ))}
                       </div>
                     </td>

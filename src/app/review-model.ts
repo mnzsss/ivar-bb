@@ -1,5 +1,8 @@
+import type { SelectedLineRange } from "@pierre/diffs";
 import type { FileDiffEntry } from "../diff.js";
-import type { ReviewComment } from "../comments.js";
+import type { ReviewComment } from "../schemas.js";
+
+export type CommentRange = { kind: "range"; start: number; end: number; side: "additions" };
 
 export function groupByRepo(files: FileDiffEntry[]) {
   const groups = new Map<string, FileDiffEntry[]>();
@@ -12,5 +15,8 @@ export const toAnnotations = (file: FileDiffEntry, comments: ReviewComment[]) =>
     .filter((c) => c.repo === file.repo && c.file === file.path)
     .map((c) => ({ side: "additions" as const, lineNumber: c.line_end, metadata: c }));
 
-export const toCommentRange = (selection: { start: number; end: number } | null) =>
-  selection && { start: Math.min(selection.start, selection.end), end: Math.max(selection.start, selection.end) };
+export function toCommentRange(selection: SelectedLineRange | null): CommentRange | { kind: "rejected" } | null {
+  if (!selection) return null;
+  if (selection.side === "deletions" || (selection.endSide ?? selection.side) === "deletions") return { kind: "rejected" };
+  return { kind: "range", start: Math.min(selection.start, selection.end), end: Math.max(selection.start, selection.end), side: "additions" };
+}

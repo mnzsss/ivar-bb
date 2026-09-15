@@ -23,10 +23,13 @@ describe("toAnnotations", () => {
 });
 
 describe("toCommentRange", () => {
-  it("keeps every line of a forward, reversed or cross-side selection", () => {
-    expect(toCommentRange({ start: 3, end: 5 })).toEqual({ start: 3, end: 5 });
-    expect(toCommentRange({ start: 5, end: 3 })).toEqual({ start: 3, end: 5 });
-    expect(toCommentRange({ start: 3, side: "deletions", end: 5, endSide: "additions" } as { start: number; end: number })).toEqual({ start: 3, end: 5 });
+  it("keeps every line of a forward or reversed new-side selection", () => {
+    expect(toCommentRange({ start: 3, end: 5 })).toEqual({ kind: "range", start: 3, end: 5, side: "additions" });
+    expect(toCommentRange({ start: 5, side: "additions", end: 3, endSide: "additions" })).toEqual({ kind: "range", start: 3, end: 5, side: "additions" });
     expect(toCommentRange(null)).toBeNull();
+  });
+  it("rejects a selection touching deleted lines, since comments carry no side", () => {
+    expect(toCommentRange({ start: 3, side: "deletions", end: 3 })).toEqual({ kind: "rejected" });
+    expect(toCommentRange({ start: 3, side: "additions", end: 5, endSide: "deletions" })).toEqual({ kind: "rejected" });
   });
 });

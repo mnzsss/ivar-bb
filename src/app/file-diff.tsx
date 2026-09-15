@@ -2,10 +2,8 @@ import { useMemo, useState } from "react";
 import { FileDiff } from "@pierre/diffs/react";
 import { parsePatchFiles } from "@pierre/diffs";
 import type { FileDiffEntry } from "../diff.js";
-import type { ReviewComment } from "../comments.js";
-import { toAnnotations, toCommentRange } from "./review-model.js";
-
-type LineRange = { start: number; end: number };
+import type { ReviewComment } from "../schemas.js";
+import { toAnnotations, toCommentRange, type CommentRange } from "./review-model.js";
 
 function CommentCard({ comment, onResolve }: { comment: ReviewComment; onResolve(id: string): void }) {
   if (comment.status === "resolved") {
@@ -47,32 +45,40 @@ export function IvarFileDiff({ file, view, comments, onAdd, onResolve }: {
   file: FileDiffEntry;
   view: "unified" | "split";
   comments: ReviewComment[];
-  onAdd(range: LineRange, body: string): void;
+  onAdd(range: CommentRange, body: string): void;
   onResolve(id: string): void;
 }) {
-  const [range, setRange] = useState<LineRange | null>(null);
+  const [range, setRange] = useState<CommentRange | null>(null);
+  const [rejected, setRejected] = useState(false);
   const fileDiff = useMemo(() => parsePatchFiles(file.patch, undefined, false)[0]?.files[0], [file.patch]);
   if (!fileDiff) return <pre>{file.patch}</pre>;
   return (
-    <FileDiff<ReviewComment | null, undefined>
-      fileDiff={fileDiff}
-      options={{
-        diffStyle: view,
-        enableLineSelection: true,
-        onLineSelected: (r) => setRange(toCommentRange(r)),
-      }}
-      selectedLines={range}
-      lineAnnotations={[
-        ...toAnnotations(file, comments),
-        ...(range ? [{ side: "additions" as const, lineNumber: range.end, metadata: null }] : []),
-      ]}
-      renderAnnotation={(a) =>
-        a.metadata ? (
-          <CommentCard comment={a.metadata} onResolve={onResolve} />
-        ) : range ? (
-          <CommentForm onSubmit={(body) => { onAdd(range, body); setRange(null); }} onCancel={() => setRange(null)} />
-        ) : null
-      }
-    />
+    <>
+      {rejected && <p role="status">Comments can only be added on added or unchanged lines (new side).</p>}
+      <FileDiff<ReviewComment | null, undefined>
+        fileDiff={fileDiff}
+        options={{
+          diffStyle: view,
+          enableLineSelection: true,
+          onLineSelected: (r) => {
+            const selection = toCommentRange(r);
+            setRejected(selection?.kind === "rejected");
+            setRange(selection?.kind === "range" ? selection : null);
+          },
+        }}
+        selectedLines={range}
+        lineAnnotations={[
+          ...toAnnotations(file, comments),
+          ...(range ? [{ side: range.side, lineNumber: range.end, metadata: null }] : []),
+        ]}
+        renderAnnotation={(a) =>
+          a.metadata ? (
+            <CommentCard comment={a.metadata} onResolve={onResolve} />
+          ) : range ? (
+            <CommentForm onSubmit={(body) => { onAdd(range, body); setRange(null); }} onCancel={() => setRange(null)} />
+          ) : null
+        }
+      />
+    </>
   );
 }

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import type { ivarRpcContract } from "../rpc.js";
-import type { FileDiffEntry } from "../diff.js";
-import type { ReviewComment } from "../comments.js";
+import type { FileDiffEntry, RepoDiffError } from "../diff.js";
+import type { ReviewComment } from "../schemas.js";
 import { IvarFileDiff } from "./file-diff.js";
 import { groupByRepo } from "./review-model.js";
+import { usePolling } from "./use-polling.js";
 
 export function ReviewView({ projectId, feature }: { projectId: string; feature: string }) {
   const rpc = useRpc<typeof ivarRpcContract>();
@@ -13,27 +14,26 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   const [comments, setComments] = useState<ReviewComment[]>([]);
   const [view, setView] = useState<"unified" | "split">("unified");
   const [threads, setThreads] = useState<Array<{ repo: string; threadId: string }>>([]);
+  const [repoErrors, setRepoErrors] = useState<RepoDiffError[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const report = (e: Error) => setError(e.message);
-  const refresh = useCallback(async () => {
-    await Promise.all([
-      rpc.call("feature.diff", { projectId, feature }).then((r) => setFiles(r.files)),
-      rpc.call("comments.list", { projectId, feature }).then((r) => setComments(r.comments)),
-    ]).catch(report);
-  }, [rpc, projectId, feature]);
-
-  useEffect(() => {
-    void refresh();
-    const timer = setInterval(refresh, 2000);
-    return () => clearInterval(timer);
-  }, [refresh]);
+  const refreshDiff = useCallback(
+    () => rpc.call("feature.diff", { projectId, feature }).then((r) => { setFiles(r.files); setRepoErrors(r.errors); }, report),
+    [rpc, projectId, feature],
+  );
+  const refreshComments = useCallback(
+    () => rpc.call("comments.list", { projectId, feature }).then((r) => { setComments(r.comments); setError(null); }, report),
+    [rpc, projectId, feature],
+  );
+  usePolling(refreshDiff, 5000);
+  usePolling(refreshComments, 2000);
 
   const addComment = (file: FileDiffEntry, range: { start: number; end: number }, body: string) =>
     rpc
       .call("comments.add", { projectId, feature, repo: file.repo, file: file.path, lineStart: range.start, lineEnd: range.end, body })
-      .then(refresh, report);
-  const resolve = (id: string) => rpc.call("comments.resolve", { projectId, feature, id }).then(refresh, report);
+      .then(refreshComments, report);
+  const resolve = (id: string) => rpc.call("comments.resolve", { projectId, feature, id }).then(refreshComments, report);
   const send = () => rpc.call("comments.send", { projectId, feature }).then((r) => setThreads(r.threads), report);
 
   const openCount = comments.filter((c) => c.status === "open").length;
@@ -58,7 +58,8 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
           ))}
         </ul>
       )}
-      {files.length === 0 && <p>No changes.</p>}
+      {repoErrors.map((e) => <p key={e.repo} role="alert">{e.repo}: {e.message}</p>)}
+      {files.length === 0 && repoErrors.length === 0 && <p>No changes.</p>}
       {groupByRepo(files).map((group) => (
         <section key={group.repo}>
           <h3 style={{ position: "sticky", top: 0, margin: 0, padding: "4px 0", background: "inherit" }}>{group.repo}</h3>

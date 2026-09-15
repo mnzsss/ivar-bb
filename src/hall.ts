@@ -1,16 +1,16 @@
 import path from "node:path";
-import type { Exec } from "./exec.js";
+import { checkedStdout, ivarJson, parseIvarJson, type Exec } from "./exec.js";
+import { featureList, repoList } from "./schemas.js";
 
-export type { Exec } from "./exec.js";
-
-export type FeatureView = { name: string; status: unknown };
 export type HallView =
-  | { status: "ok"; root: string; repos: unknown[]; features: FeatureView[] }
+  | { status: "ok"; root: string; repos: string[]; features: Array<{ name: string; promoted: string[] }> }
   | { status: "no-hall" }
   | { status: "ivar-missing" };
 
-export const ALLOWED_COMMANDS = ["sync", "feature create", "promote"] as const;
-export type AllowedCommand = (typeof ALLOWED_COMMANDS)[number];
+export type HallCommand =
+  | { command: "sync" }
+  | { command: "feature create"; name: string }
+  | { command: "promote"; feature: string; repo: string };
 
 export async function findHallRoot(start: string, exists: (p: string) => Promise<boolean>): Promise<string | null> {
   for (let dir = start; ; dir = path.dirname(dir)) {
@@ -22,21 +22,29 @@ export async function findHallRoot(start: string, exists: (p: string) => Promise
 export async function getHall(start: string, run: Exec, exists: (p: string) => Promise<boolean>): Promise<HallView> {
   const root = await findHallRoot(start, exists);
   if (!root) return { status: "no-hall" };
-  const repoList = await run("ivar", ["repo", "list", "--json"], root);
-  if (repoList.code === 127) return { status: "ivar-missing" };
-  const featureList = await run("ivar", ["feature", "list", "--json"], root);
-  const repos: unknown[] = JSON.parse(repoList.stdout).repos ?? [];
-  const names: Array<{ name: string }> = JSON.parse(featureList.stdout).features ?? [];
-  const features = await Promise.all(
-    names.map(async ({ name }) => ({
-      name,
-      status: JSON.parse((await run("ivar", ["feature", "status", name, "--json"], root)).stdout) as unknown,
-    })),
-  );
-  return { status: "ok", root, repos, features };
+  const repoArgs = ["--json", "repo", "list"];
+  const repoResult = await run("ivar", repoArgs, root);
+  if (repoResult.code === 127) return { status: "ivar-missing" };
+  const repos = parseIvarJson(checkedStdout(repoResult, "ivar", repoArgs), repoList).repos.map((r) => r.name);
+  const { features } = await ivarJson(root, ["feature", "list"], run, featureList);
+  return { status: "ok", root, repos, features: features.map((f) => ({ name: f.name, promoted: f.repos })) };
 }
 
-export async function runIvar(root: string, command: AllowedCommand, args: string[], run: Exec) {
-  if (!ALLOWED_COMMANDS.includes(command)) throw new Error(`ivar ${command} is not allowed`);
-  return run("ivar", [...command.split(" "), ...args], root);
+function positional(value: string): string {
+  if (value.startsWith("-")) throw new Error(`"${value}" must not start with "-"`);
+  return value;
 }
+
+export function hallCommandArgs(input: HallCommand): string[] {
+  switch (input.command) {
+    case "sync":
+      return ["sync"];
+    case "feature create":
+      return ["feature", "create", "--", input.name];
+    case "promote":
+      // `ivar feature promote -- <feature> <repo>` is rejected by clap (optional [FEATURE] before <REPO>), so refuse flag-like values instead.
+      return ["feature", "promote", positional(input.feature), positional(input.repo)];
+  }
+}
+
+export const runIvar = (root: string, input: HallCommand, run: Exec) => run("ivar", hallCommandArgs(input), root);

@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { addComment, buildThreadPrompt, sendToThreads, type ReviewComment } from "./comments";
-import type { Exec } from "./hall";
+import { addComment, buildThreadPrompt, sendToThreads } from "./comments";
+import type { Exec } from "./exec";
+import type { ReviewComment } from "./schemas";
 
 const open = (id: string, repo: string): ReviewComment => ({ id, repo, file: "src/a.ts", line_start: 3, line_end: 5, body: `fix ${id}`, status: "open" });
 
 describe("addComment", () => {
-  it("shells out to ivar with a lines range and parses the json comment", async () => {
+  it("passes values in --flag=value form and the feature after --", async () => {
     let seen: string[] = [];
     const run: Exec = async (_c, args) => { seen = args; return { code: 0, stderr: "", stdout: JSON.stringify(open("c1", "api")) }; };
-    const c = await addComment("/h", "checkout", { repo: "api", file: "src/a.ts", lineStart: 3, lineEnd: 5, body: "fix c1" }, run);
-    expect(seen).toEqual(["review", "comment", "add", "checkout", "--repo", "api", "--file", "src/a.ts", "--lines", "3-5", "--body", "fix c1", "--json"]);
+    const c = await addComment("/h", "checkout", { repo: "api", file: "src/a.ts", lineStart: 3, lineEnd: 5, body: "- starts with a dash" }, run);
+    expect(seen).toEqual(["--json", "review", "comment", "add", "--repo=api", "--file=src/a.ts", "--lines=3-5", "--body=- starts with a dash", "--", "checkout"]);
     expect(c.id).toBe("c1");
   });
   it("throws the ivar stderr on failure", async () => {
@@ -33,9 +34,10 @@ describe("buildThreadPrompt", () => {
 
 describe("sendToThreads", () => {
   it("spawns one thread per repo with open comments, in that repo's worktree", async () => {
-    const run: Exec = async (_c, args) => ({ code: 0, stderr: "", stdout: args[0] === "review"
+    const repo = (name: string) => ({ repo: name, worktree: `/h/.ivar/repos/${name}/checkout`, base: "main", worktree_present: true, state: "ready" });
+    const run: Exec = async (_c, args) => ({ code: 0, stderr: "", stdout: args[1] === "review"
       ? JSON.stringify({ comments: [open("c1", "api"), open("c2", "api"), open("c3", "web")] })
-      : JSON.stringify({ repos: [{ repo: "api", worktree: "/h/.ivar/repos/api/checkout" }, { repo: "web", worktree: "/h/.ivar/repos/web/checkout" }] }) });
+      : JSON.stringify({ repos: [repo("api"), repo("web")] }) });
     const spawned: Array<{ repo: string; worktree: string }> = [];
     const result = await sendToThreads("/h", "checkout", run, async (t) => { spawned.push(t); return { threadId: `t-${t.repo}` }; });
     expect(spawned.map((t) => [t.repo, t.worktree])).toEqual([["api", "/h/.ivar/repos/api/checkout"], ["web", "/h/.ivar/repos/web/checkout"]]);
