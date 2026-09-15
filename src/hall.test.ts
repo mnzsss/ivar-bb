@@ -53,6 +53,9 @@ describe("hallCommandArgs", () => {
   it("refuses flag-like promote values since promote cannot take --", () => {
     expect(() => hallCommandArgs({ command: "promote", feature: "checkout", repo: "--base=x" })).toThrow('must not start with "-"');
   });
+  it("refuses a flag-like promote feature", () => {
+    expect(() => hallCommandArgs({ command: "promote", feature: "--base=x", repo: "api" })).toThrow('must not start with "-"');
+  });
 });
 
 describe("runIvar", () => {
