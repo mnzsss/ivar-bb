@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { countChanges, groupByRepo, toAnnotations, toCommentRange, toggleKey } from "./review-model";
+import { countChanges, errorMessage, groupByRepo, toAnnotations, toCommentRange, toggleKey } from "./review-model";
 
 const file = (repo: string, path: string) => ({ repo, path, patch: "" });
 const comment = (id: string, repo: string, path: string, line_end: number, status: "open" | "resolved" = "open") =>
@@ -31,6 +31,16 @@ describe("toCommentRange", () => {
   it("rejects a selection touching deleted lines, since comments carry no side", () => {
     expect(toCommentRange({ start: 3, side: "deletions", end: 3 })).toEqual({ kind: "rejected" });
     expect(toCommentRange({ start: 3, side: "additions", end: 5, endSide: "deletions" })).toEqual({ kind: "rejected" });
+  });
+});
+
+describe("errorMessage", () => {
+  it("uses the Error message", () => {
+    expect(errorMessage(new Error("boom"))).toBe("boom");
+  });
+  it("stringifies a non-Error value", () => {
+    expect(errorMessage("boom")).toBe("boom");
+    expect(errorMessage(null)).toBe("null");
   });
 });
 

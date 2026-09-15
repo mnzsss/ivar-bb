@@ -21,6 +21,10 @@ export function toCommentRange(selection: SelectedLineRange | null): CommentRang
   return { kind: "range", start: Math.min(selection.start, selection.end), end: Math.max(selection.start, selection.end), side: "additions" };
 }
 
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function toggleKey(keys: ReadonlySet<string>, key: string): Set<string> {
   const next = new Set(keys);
   if (!next.delete(key)) next.add(key);
