@@ -126,7 +126,7 @@ async function untrackedDiff(
   const entries = await Promise.all(
     listed
       .split("\0")
-      .filter((path) => path && !path.endsWith("/"))
+      .filter((path) => path && !path.endsWith("/") && !/[\n\t"\\]/.test(path))
       .map(async (path) => {
         const patch = await skipMissing(untrackedEntryPatch(path, join(worktree, path), fs));
         return patch === null ? [] : [{ repo, path, patch }];

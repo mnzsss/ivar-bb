@@ -100,7 +100,9 @@ describe("countChanges", () => {
 });
 
 describe("fileKey", () => {
-  it("joins repo and path", () => expect(fileKey(file("api", "src/a.ts"))).toBe("api/src/a.ts"));
+  it("joins repo and path", () => expect(fileKey(file("api", "src/a.ts"))).toBe("api\0src/a.ts"));
+  it("does not collide when a slash moves between repo and path", () =>
+    expect(fileKey({ repo: "a", path: "b/c" })).not.toBe(fileKey({ repo: "a/b", path: "c" })));
 });
 
 describe("reuseUnchangedFiles", () => {
@@ -145,7 +147,13 @@ describe("commentsByFile", () => {
     ]);
     expect(byFile.get(fileKey(file("api", "a")))?.map((c) => c.id)).toEqual(["1", "3"]);
     expect(byFile.get(fileKey(file("web", "a")))?.map((c) => c.id)).toEqual(["2"]);
-    expect(byFile.get("api/missing")).toBeUndefined();
+    expect(byFile.get(fileKey(file("api", "missing")))).toBeUndefined();
+  });
+  it("keeps files apart when a slash moves between repo and path", () => {
+    const byFile = commentsByFile([comment("1", "a", "b/c", 1), comment("2", "a/b", "c", 1)]);
+    expect(byFile.size).toBe(2);
+    expect(byFile.get(fileKey({ repo: "a", path: "b/c" }))?.map((c) => c.id)).toEqual(["1"]);
+    expect(byFile.get(fileKey({ repo: "a/b", path: "c" }))?.map((c) => c.id)).toEqual(["2"]);
   });
 });
 

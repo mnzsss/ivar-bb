@@ -203,6 +203,26 @@ describe("featureDiff", () => {
     expect(errors).toEqual([]);
     expect(files.map((f) => f.path)).toEqual(["src/a.ts", "README.md", "ok.md"]);
   });
+  it("skips untracked paths that cannot be written into a diff header unquoted", async () => {
+    const run: Exec = async (cmd, args) => {
+      if (cmd === "ivar") return { code: 0, stderr: "", stdout: status({ repo: "api" }) };
+      if (args[0] === "merge-base") return { code: 0, stdout: "abc\n", stderr: "" };
+      if (args[0] === "ls-files")
+        return { code: 0, stdout: "ok.md\0bad\nname.md\0tab\tname.md\0", stderr: "" };
+      return { code: 0, stdout: "", stderr: "" };
+    };
+    const touched: string[] = [];
+    const inner = fakeFs({});
+    const fs: UntrackedFs = {
+      lstat: async (p) => (touched.push(p), inner.lstat(p)),
+      readFile: async (p) => (touched.push(p), inner.readFile(p)),
+      readlink: async (p) => (touched.push(p), inner.readlink(p)),
+    };
+    const { files, errors } = await featureDiff("/h", "checkout", run, fs);
+    expect(errors).toEqual([]);
+    expect(files.map((f) => f.path)).toEqual(["ok.md"]);
+    expect(touched.every((p) => p.endsWith("/ok.md"))).toBe(true);
+  });
   it("renders an untracked symlink as a 120000 patch of its target", async () => {
     const { files, errors } = await featureDiff(
       "/h",

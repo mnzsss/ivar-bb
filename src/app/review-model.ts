@@ -4,7 +4,7 @@ import type { ReviewComment } from "../schemas.js";
 
 export type CommentRange = { kind: "range"; start: number; end: number; side: "additions" };
 
-export const fileKey = (file: { repo: string; path: string }) => `${file.repo}/${file.path}`;
+export const fileKey = (file: { repo: string; path: string }) => `${file.repo}\0${file.path}`;
 
 export function reuseUnchangedFiles(previous: FileDiffEntry[], next: FileDiffEntry[]) {
   const byKey = new Map(previous.map((f) => [fileKey(f), f]));
