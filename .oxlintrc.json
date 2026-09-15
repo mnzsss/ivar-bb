@@ -10,7 +10,7 @@
     "node": true,
     "browser": true
   },
-  "ignorePatterns": ["dist/**"],
+  "ignorePatterns": ["dist/**", "components/ui/**", "lib/**"],
   "rules": {
     "react/react-in-jsx-scope": "off"
   },
