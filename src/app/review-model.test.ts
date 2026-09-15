@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByRepo, toAnnotations } from "./review-model";
+import { groupByRepo, toAnnotations, toCommentRange } from "./review-model";
 
 const file = (repo: string, path: string) => ({ repo, path, patch: "" });
 const comment = (id: string, repo: string, path: string, line_end: number, status: "open" | "resolved" = "open") =>
@@ -19,5 +19,14 @@ describe("toAnnotations", () => {
     ]);
     expect(anns.map((a) => [a.lineNumber, a.metadata.id])).toEqual([[7, "c1"], [9, "c4"]]);
     expect(anns.every((a) => a.side === "additions")).toBe(true);
+  });
+});
+
+describe("toCommentRange", () => {
+  it("keeps every line of a forward, reversed or cross-side selection", () => {
+    expect(toCommentRange({ start: 3, end: 5 })).toEqual({ start: 3, end: 5 });
+    expect(toCommentRange({ start: 5, end: 3 })).toEqual({ start: 3, end: 5 });
+    expect(toCommentRange({ start: 3, side: "deletions", end: 5, endSide: "additions" } as { start: number; end: number })).toEqual({ start: 3, end: 5 });
+    expect(toCommentRange(null)).toBeNull();
   });
 });

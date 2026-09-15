@@ -3,7 +3,7 @@ import { FileDiff } from "@pierre/diffs/react";
 import { parsePatchFiles } from "@pierre/diffs";
 import type { FileDiffEntry } from "../diff.js";
 import type { ReviewComment } from "../comments.js";
-import { toAnnotations } from "./review-model.js";
+import { toAnnotations, toCommentRange } from "./review-model.js";
 
 type LineRange = { start: number; end: number };
 
@@ -59,7 +59,7 @@ export function IvarFileDiff({ file, view, comments, onAdd, onResolve }: {
       options={{
         diffStyle: view,
         enableLineSelection: true,
-        onLineSelected: (r) => setRange(r ? { start: Math.min(r.start, r.end), end: Math.max(r.start, r.end) } : null),
+        onLineSelected: (r) => setRange(toCommentRange(r)),
       }}
       lineAnnotations={[
         ...toAnnotations(file, comments),
