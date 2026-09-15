@@ -74,3 +74,15 @@ export function countChanges(patch: string) {
   }
   return { additions, deletions };
 }
+
+export function estimatedDiffHeight(patch: string, lineHeightPx = 20) {
+  const hunkStart = patch.indexOf("\n@@");
+  const lines =
+    hunkStart === -1
+      ? 1
+      : patch
+          .slice(hunkStart + 1)
+          .split("\n")
+          .filter(Boolean).length;
+  return Math.max(1, lines) * lineHeightPx;
+}

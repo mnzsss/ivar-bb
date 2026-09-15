@@ -5,12 +5,14 @@ import type { FileDiffEntry } from "../diff.js";
 import type { ReviewComment } from "../schemas.js";
 import {
   countChanges,
+  estimatedDiffHeight,
   fileKey,
   toAnnotations,
   toCommentRange,
   type CommentRange,
 } from "./review-model.js";
 import { buttonClass, mutedTextClass, primaryButtonClass } from "./ui.js";
+import { useNearViewport } from "./use-near-viewport.js";
 
 function CommentCard({
   comment,
@@ -135,9 +137,11 @@ export const IvarFileDiff = memo(function IvarFileDiff({
     [file.patch],
   );
   const changes = useMemo(() => countChanges(file.patch), [file.patch]);
+  const [nearRef, near] = useNearViewport<HTMLDivElement>();
+  const placeholderHeight = useMemo(() => estimatedDiffHeight(file.patch), [file.patch]);
 
   return (
-    <div className="overflow-hidden rounded-md border border-[var(--border)]">
+    <div ref={nearRef} className="overflow-hidden rounded-md border border-[var(--border)]">
       <div className="flex items-center gap-2 bg-[var(--muted)] px-2 py-1 text-xs">
         <button
           className="flex min-w-0 flex-1 items-center gap-2 bg-transparent text-left text-[var(--foreground)]"
@@ -156,7 +160,9 @@ export const IvarFileDiff = memo(function IvarFileDiff({
         )}
         <span className={mutedTextClass}>{file.repo}</span>
       </div>
-      {collapsed ? null : !fileDiff ? (
+      {collapsed ? null : !near ? (
+        <div aria-hidden style={{ height: placeholderHeight }} />
+      ) : !fileDiff ? (
         <pre className="m-0 overflow-auto p-2 text-xs">{file.patch}</pre>
       ) : (
         <FileDiff<ReviewComment | null, undefined>

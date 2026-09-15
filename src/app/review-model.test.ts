@@ -3,6 +3,7 @@ import {
   commentsByFile,
   countChanges,
   errorMessage,
+  estimatedDiffHeight,
   fileKey,
   groupByRepo,
   reuseIfEqual,
@@ -146,5 +147,17 @@ describe("commentsByFile", () => {
     expect(byFile.get(fileKey(file("api", "a")))?.map((c) => c.id)).toEqual(["1", "3"]);
     expect(byFile.get(fileKey(file("web", "a")))?.map((c) => c.id)).toEqual(["2"]);
     expect(byFile.get("api/missing")).toBeUndefined();
+  });
+});
+
+describe("estimatedDiffHeight", () => {
+  it("scales with hunk lines and ignores the file header", () => {
+    const patch = "diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,3 @@\n a\n-b\n+c\n+d\n";
+    expect(estimatedDiffHeight(patch)).toBe(5 * 20);
+  });
+  it("reserves one line for a patch without hunks", () => {
+    expect(estimatedDiffHeight("diff --git a/x b/x\nBinary files /dev/null and b/x differ\n")).toBe(
+      20,
+    );
   });
 });
