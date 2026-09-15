@@ -81,7 +81,7 @@ export function HallView({ projectId }: { projectId: string }) {
                       )}
                     </td>
                     <td>
-                      <button onClick={() => navigate.toPluginPanel("ivar", { subPath: feature.href })}>Review</button>
+                      <button onClick={() => navigate.toPluginPanel("ivar", { subPath: `${encodeURIComponent(projectId)}/${feature.href}` })}>Review</button>
                     </td>
                   </tr>
                 ))}

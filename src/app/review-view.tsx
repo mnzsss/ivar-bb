@@ -41,7 +41,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
   return (
     <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16 }}>
       <header style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => navigate.toPluginPanel("ivar")}>Back</button>
+        <button onClick={() => navigate.toPluginPanel("ivar", { subPath: encodeURIComponent(projectId) })}>Back</button>
         <h2 style={{ margin: 0, flex: 1 }}>{feature}</h2>
         <button onClick={() => setView(view === "unified" ? "split" : "unified")}>
           {view === "unified" ? "Split" : "Unified"}
