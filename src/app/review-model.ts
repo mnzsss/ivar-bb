@@ -35,10 +35,17 @@ export function commentsByFile(comments: ReviewComment[]) {
   return groups;
 }
 
-export const toAnnotations = (file: FileDiffEntry, comments: ReviewComment[]) =>
-  comments
-    .filter((c) => c.repo === file.repo && c.file === file.path)
-    .map((c) => ({ side: "additions" as const, lineNumber: c.line_end, metadata: c }));
+export function reuseUnchangedGroups(
+  previous: Map<string, ReviewComment[]>,
+  next: Map<string, ReviewComment[]>,
+) {
+  return new Map(
+    [...next].map(([key, group]) => [key, reuseIfEqual(previous.get(key) ?? group, group)]),
+  );
+}
+
+export const toAnnotations = (comments: ReviewComment[]) =>
+  comments.map((c) => ({ side: "additions" as const, lineNumber: c.line_end, metadata: c }));
 
 export function toCommentRange(
   selection: SelectedLineRange | null,

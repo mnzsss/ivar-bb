@@ -12,6 +12,7 @@ import {
   groupByRepo,
   reuseIfEqual,
   reuseUnchangedFiles,
+  reuseUnchangedGroups,
   toggleKey,
   type CommentRange,
 } from "./review-model.js";
@@ -98,7 +99,12 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
     () => (showResolved ? comments : comments.filter((c) => c.status === "open")),
     [comments, showResolved],
   );
-  const byFile = useMemo(() => commentsByFile(visibleComments), [visibleComments]);
+  const [byFile, setByFile] = useState(() => commentsByFile(visibleComments));
+  const [groupedComments, setGroupedComments] = useState(visibleComments);
+  if (groupedComments !== visibleComments) {
+    setGroupedComments(visibleComments);
+    setByFile((previous) => reuseUnchangedGroups(previous, commentsByFile(visibleComments)));
+  }
   const allCollapsed = files.length > 0 && files.every((f) => collapsed.has(fileKey(f)));
 
   return (
@@ -113,7 +119,7 @@ export function ReviewView({ projectId, feature }: { projectId: string; feature:
         </Button>
         <h2 className="m-0 min-w-0 flex-1 truncate text-sm font-semibold">
           {feature}{" "}
-          <span className={"text-xs font-normal text-muted-foreground"}>{files.length} files</span>
+          <span className="text-xs font-normal text-muted-foreground">{files.length} files</span>
         </h2>
         <div className="inline-flex" role="group" aria-label="Diff style">
           {(["unified", "split"] as const).map((style) => (

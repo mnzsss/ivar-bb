@@ -7,6 +7,7 @@ import {
   fileKey,
   groupByRepo,
   reuseIfEqual,
+  reuseUnchangedGroups,
   reuseUnchangedFiles,
   toAnnotations,
   toCommentRange,
@@ -33,11 +34,9 @@ describe("groupByRepo", () => {
 });
 
 describe("toAnnotations", () => {
-  it("anchors open and resolved comments of this repo and file at their last line on the new side", () => {
-    const anns = toAnnotations(file("api", "a"), [
+  it("anchors open and resolved comments at their last line on the new side", () => {
+    const anns = toAnnotations([
       comment("c1", "api", "a", 7),
-      comment("c2", "api", "b", 2),
-      comment("c3", "web", "a", 4),
       comment("c4", "api", "a", 9, "resolved"),
     ]);
     expect(anns.map((a) => [a.lineNumber, a.metadata.id])).toEqual([
@@ -147,6 +146,29 @@ describe("commentsByFile", () => {
     expect(byFile.get(fileKey(file("api", "a")))?.map((c) => c.id)).toEqual(["1", "3"]);
     expect(byFile.get(fileKey(file("web", "a")))?.map((c) => c.id)).toEqual(["2"]);
     expect(byFile.get("api/missing")).toBeUndefined();
+  });
+});
+
+describe("reuseUnchangedGroups", () => {
+  it("keeps unchanged groups by identity, takes changed ones and drops removed keys", () => {
+    const unchanged = [comment("1", "api", "a", 1)];
+    const previous = new Map([
+      ["api/a", unchanged],
+      ["api/b", [comment("2", "api", "b", 2)]],
+      ["api/gone", [comment("3", "api", "gone", 3)]],
+    ]);
+    const changedB = [comment("2", "api", "b", 2, "resolved")];
+    const next = reuseUnchangedGroups(
+      previous,
+      new Map([
+        ["api/a", [comment("1", "api", "a", 1)]],
+        ["api/b", changedB],
+      ]),
+    );
+    expect(next.get("api/a")).toBe(unchanged);
+    expect(next.get("api/b")).toBe(changedB);
+    expect(next.has("api/gone")).toBe(false);
+    expect([...next.keys()]).toEqual(["api/a", "api/b"]);
   });
 });
 

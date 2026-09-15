@@ -17,6 +17,7 @@ import type { HallCommand } from "../hall.js";
 import type { ExecResult as RunResult } from "../exec.js";
 import type { HallView as HallData } from "../schemas.js";
 import { hallSummary } from "./hall-model.js";
+import { reuseIfEqual } from "./review-model.js";
 import { usePolling } from "./use-polling.js";
 
 export function HallView({ projectId }: { projectId: string }) {
@@ -31,7 +32,7 @@ export function HallView({ projectId }: { projectId: string }) {
     () =>
       rpc.call("hall.get", { projectId }).then(
         (h) => {
-          setHall(h);
+          setHall((previous) => (previous ? reuseIfEqual(previous, h) : h));
           setError(null);
         },
         (e: Error) => setError(e.message),

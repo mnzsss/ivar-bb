@@ -29,7 +29,7 @@ function CommentCard({
     >
       <p className="m-0 min-w-0 flex-1 whitespace-pre-wrap">
         {resolved && (
-          <span className={"mr-2 text-xs text-muted-foreground"}>
+          <span className="mr-2 text-muted-foreground">
             Resolved · L{comment.line_start}–{comment.line_end}
           </span>
         )}
@@ -113,10 +113,10 @@ export const IvarFileDiff = memo(function IvarFileDiff({
   );
   const lineAnnotations = useMemo(
     () => [
-      ...toAnnotations(file, comments),
+      ...toAnnotations(comments),
       ...(range ? [{ side: range.side, lineNumber: range.end, metadata: null }] : []),
     ],
-    [file, comments, range],
+    [comments, range],
   );
   const renderAnnotation = useCallback(
     (a: DiffLineAnnotation<ReviewComment | null>) =>
